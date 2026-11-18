@@ -1,0 +1,11 @@
+target/
+.tools/
+*.class
+.idea/
+.vscode/
+*.iml
+/dist/
+/smoke-test-report.json
+/compat-report.json
+/screenshot-*.png
+/checks.log
