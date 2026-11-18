@@ -132,7 +132,7 @@ The smoke script calls the real front-end adapter path
   result.
 
 Latest run: `SMOKE PASS count=10 levels={Low=2, Medium=2, High=4,
-NotVerified=2} backend=tauri`, ~2.4 s.
+NotVerified=2} backend=tauri`, ~2.1 s.
 
 ## WebView compatibility audit
 
@@ -152,6 +152,10 @@ WebKit 617.1 (JavaFX 22), localStorage available. Unsupported checks and impact:
 `color-mix`, container queries, subgrid, `dvh/svh`, modern JS (optional
 chaining, nullish, class fields, structuredClone, Resize/IntersectionObserver,
 crypto.randomUUID) all pass.
+
+The audit exits non-zero if `localStorage` is unavailable, because history and
+settings depend on it. Unsupported CSS features are reported but do not fail the
+gate; their impact is either absent or mitigated in the shim.
 
 ## One-command gate
 

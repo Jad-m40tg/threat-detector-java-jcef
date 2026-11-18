@@ -60,9 +60,10 @@ A virtual-thread executor submits item tasks; a fair `Semaphore` bounds active
 analysis to `concurrency` (default 8, capped 32). An
 `ExecutorCompletionService` feeds a single aggregator thread that owns all
 counters, so there is no mutex on batch state. Progress is throttled to one
-update per 40 ms plus a guaranteed final update. This preserves the Rust
-semaphore/aggregator semantics; the scheduler differs but observable bounds and
-event ordering do not.
+update per 40 ms, with a final update when the last item of a complete batch
+lands; cancelled batches end with `batch-done`, whose count is authoritative.
+This preserves the Rust semaphore/aggregator semantics; the scheduler differs
+but observable bounds and event ordering do not.
 
 ## D9 - Batch reply timing
 

@@ -22,7 +22,8 @@ run-checks.bat
 
 This runs the 31 JUnit tests (including a 562-input differential test against
 Rust goldens), the end-to-end smoke test, and the WebView compatibility audit.
-Expected final line: `CHECKS PASSED`.
+The audit fails if localStorage is unavailable, because history and settings
+depend on it. Expected final line: `CHECKS PASSED`.
 
 ## Build a release
 

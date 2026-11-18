@@ -98,9 +98,10 @@ not an error.
 Ordering guarantees:
 
 - One `item-start` and one `item-done` per started item; start precedes done.
-- Progress is throttled to at most one event per 40 ms, plus a guaranteed final
-  event where `done == total` (for cancelled batches, `total` is the parsed row
-  count and `done` is what was delivered).
+- Progress is throttled to at most one event per 40 ms. A complete batch always
+  emits a final event with `done == total`. A cancelled batch may end without a
+  final progress event; `batch-done` is authoritative and its `count` equals the
+  results actually delivered.
 - `batch-done` is the last event of a batch and carries every delivered result.
 - Items that were never started (cancellation) have no start/done pair.
 

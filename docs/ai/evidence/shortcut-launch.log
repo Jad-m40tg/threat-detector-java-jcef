@@ -1,8 +1,8 @@
-Nov 18, 2026 11:42:22 PM com.sun.javafx.application.PlatformImpl startup
+Nov 18, 2026 11:49:16 PM com.sun.javafx.application.PlatformImpl startup
 WARNING: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @7133b0f7'
-Nov 18, 2026 11:42:23 PM com.dac.threatdetector.app.WebHost extractWeb
+Nov 18, 2026 11:49:19 PM com.dac.threatdetector.app.WebHost extractWeb
 INFO: Extracted front-end to C:\Users\ASUS Vivo\AppData\Roaming\ThreatDetector\web
-Nov 18, 2026 11:42:23 PM com.dac.threatdetector.app.WebHost start
+Nov 18, 2026 11:49:19 PM com.dac.threatdetector.app.WebHost start
 INFO: Web host ready at http://127.0.0.1:47821/
-Nov 18, 2026 11:42:26 PM com.dac.threatdetector.app.App onPageReady
+Nov 18, 2026 11:49:27 PM com.dac.threatdetector.app.App onPageReady
 INFO: READY page loaded, bridge attached

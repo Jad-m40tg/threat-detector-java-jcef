@@ -1,21 +1,21 @@
-Nov 18, 2026 11:40:33 PM com.sun.javafx.application.PlatformImpl startup
+Nov 18, 2026 11:45:47 PM com.sun.javafx.application.PlatformImpl startup
 WARNING: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @21417c18'
-Nov 18, 2026 11:40:34 PM com.dac.threatdetector.app.WebHost extractWeb
+Nov 18, 2026 11:45:48 PM com.dac.threatdetector.app.WebHost extractWeb
 INFO: Extracted front-end to C:\Users\ASUS Vivo\AppData\Roaming\ThreatDetector\web
-Nov 18, 2026 11:40:34 PM com.dac.threatdetector.app.WebHost start
+Nov 18, 2026 11:45:48 PM com.dac.threatdetector.app.WebHost start
 INFO: Web host ready at http://127.0.0.1:47821/
-Nov 18, 2026 11:40:39 PM com.dac.threatdetector.app.App onPageReady
+Nov 18, 2026 11:45:53 PM com.dac.threatdetector.app.App onPageReady
 INFO: READY page loaded, bridge attached
-Nov 18, 2026 11:40:42 PM com.dac.threatdetector.app.App$SmokeCallback done
+Nov 18, 2026 11:45:55 PM com.dac.threatdetector.app.App$SmokeCallback done
 INFO: SMOKE PASS count=10 levels={Low=2, Medium=2, High=4, NotVerified=2} backend=tauri
-Nov 18, 2026 11:40:43 PM com.sun.javafx.application.PlatformImpl startup
+Nov 18, 2026 11:45:56 PM com.sun.javafx.application.PlatformImpl startup
 WARNING: Unsupported JavaFX configuration: classes were loaded from 'unnamed module @7133b0f7'
-Nov 18, 2026 11:40:44 PM com.dac.threatdetector.app.WebHost extractWeb
+Nov 18, 2026 11:45:58 PM com.dac.threatdetector.app.WebHost extractWeb
 INFO: Extracted front-end to C:\Users\ASUS Vivo\AppData\Roaming\ThreatDetector\web
-Nov 18, 2026 11:40:45 PM com.dac.threatdetector.app.WebHost start
+Nov 18, 2026 11:45:58 PM com.dac.threatdetector.app.WebHost start
 INFO: Web host ready at http://127.0.0.1:47821/
-Nov 18, 2026 11:40:49 PM com.dac.threatdetector.app.App onPageReady
+Nov 18, 2026 11:46:02 PM com.dac.threatdetector.app.App onPageReady
 INFO: READY page loaded, bridge attached
-Nov 18, 2026 11:40:52 PM com.dac.threatdetector.app.App$CompatCallback done
-INFO: COMPAT REPORT written
+Nov 18, 2026 11:46:05 PM com.dac.threatdetector.app.App$CompatCallback done
+INFO: COMPAT PASS webkit=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/617.1 (KHTML, like Gecko) JavaFX/22 Safari/617.1 ThreatDetectorJavaFX
 CHECKS PASSED

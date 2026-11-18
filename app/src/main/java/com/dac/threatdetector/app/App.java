@@ -399,17 +399,22 @@ public final class App extends Application {
         public void done(String json) {
             try {
                 Map<String, Object> report = new LinkedHashMap<>();
-                report.put("ok", true);
                 report.put("timestamp", System.currentTimeMillis());
                 report.put("userAgent", engine.getUserAgent());
                 JsonNode payload = mapper.readTree(json);
+                boolean storage = payload.path("localStorage").asBoolean(false);
+                // History and settings persist through localStorage. A missing
+                // storage backend is a functional failure, unlike the cosmetic
+                // CSS gaps recorded below.
+                report.put("ok", storage);
                 report.put("checks", mapper.convertValue(payload.path("checks"), Map.class));
-                report.put("localStorage", payload.path("localStorage").asBoolean(false));
+                report.put("localStorage", storage);
                 report.put("frameTiming", mapper.convertValue(payload.path("frameTiming"), Map.class));
                 mapper.writerWithDefaultPrettyPrinter().writeValue(
                         Path.of(System.getProperty("user.dir"), "compat-report.json").toFile(), report);
-                LOG.info("COMPAT REPORT written");
-                exit(0);
+                LOG.info((storage ? "COMPAT PASS" : "COMPAT FAIL: localStorage unavailable")
+                        + " webkit=" + engine.getUserAgent());
+                exit(storage ? 0 : 1);
             } catch (Exception error) {
                 LOG.log(Level.SEVERE, "Compat report failed", error);
                 writeFailureReport(error.toString());

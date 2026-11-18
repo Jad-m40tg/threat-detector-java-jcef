@@ -1,7 +1,7 @@
 {
-  "ok" : true,
-  "timestamp" : 1795041652728,
+  "timestamp" : 1795041965301,
   "userAgent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/617.1 (KHTML, like Gecko) JavaFX/22 Safari/617.1 ThreatDetectorJavaFX",
+  "ok" : true,
   "checks" : {
     "css-color-mix" : true,
     "css-has" : false,
@@ -24,7 +24,7 @@
   "localStorage" : true,
   "frameTiming" : {
     "frames" : 59,
-    "avgMs" : 51.33898305084746,
-    "maxMs" : 1288
+    "avgMs" : 48.355932203389834,
+    "maxMs" : 1089
   }
 }

@@ -13,7 +13,8 @@ Living project memory for the Java/JavaFX port. Newest entries first.
 - Smoke: `ok=true`, `backend=tauri`, 10 rows, 2 Low / 2 Medium / 4 High /
   2 NotVerified.
 - Compatibility: WebKit 617.1; localStorage works; shade-picker `aspect-ratio`
-  gap fixed inside the shim.
+  gap fixed inside the shim. The compat audit now fails the gate if
+  localStorage is unavailable.
 
 ## Phase log
 
