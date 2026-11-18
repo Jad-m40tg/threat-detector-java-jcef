@@ -1,0 +1,17 @@
+﻿Front-end fidelity audit (SHA-256), 2026-11-18 23:44
+Source: C:\Users\ASUS Vivo\Desktop\DAC_Tauri\src
+Copy:   C:\Users\ASUS Vivo\Desktop\DAC_Java\app\src\main\resources\web
+Source files: 38 (docs excluded)
+Copy files:   39
+
+Only in copy:
+  js\core\java-shim.js
+Only in source:
+Modified:
+  hardware.html
+  history.html
+  index.html
+  settings.html
+
+All other files are byte-identical. Each modified HTML file differs by one added line:
+  <script src="js/core/java-shim.js"></script>

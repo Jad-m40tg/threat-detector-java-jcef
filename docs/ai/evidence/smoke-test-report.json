@@ -1,0 +1,263 @@
+{
+  "ok" : true,
+  "timestamp" : 1795041642131,
+  "durationMs" : 2542,
+  "dataset" : "C:\\Users\\ASUS Vivo\\AppData\\Roaming\\ThreatDetector\\testdata\\project_test_dataset.csv",
+  "backend" : "tauri",
+  "count" : 10,
+  "levels" : {
+    "Low" : 2,
+    "Medium" : 2,
+    "High" : 4,
+    "NotVerified" : 2
+  },
+  "batchId" : "batch-1795041639756",
+  "error" : "",
+  "userAgent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/617.1 (KHTML, like Gecko) JavaFX/22 Safari/617.1 ThreatDetectorJavaFX",
+  "screenshot" : "C:\\Users\\ASUS Vivo\\Desktop\\DAC_Java\\screenshot-index.png",
+  "results" : [ {
+    "id" : "2",
+    "inputType" : "url",
+    "input" : "http://192.168.1.50/portal/update",
+    "riskLevel" : "High",
+    "risk" : "high",
+    "state" : "THREAT",
+    "score" : 90,
+    "status" : "verified",
+    "category" : "High Risk Threat Detected",
+    "details" : "Uses unencrypted HTTP protocol; Hostname is a raw IP address instead of a domain name",
+    "reasons" : [ "Uses unencrypted HTTP protocol", "Hostname is a raw IP address instead of a domain name" ],
+    "triggeredRules" : [ {
+      "id" : "http_protocol",
+      "description" : "Uses unencrypted HTTP protocol",
+      "points" : 2
+    }, {
+      "id" : "ip_host",
+      "description" : "Hostname is a raw IP address instead of a domain name",
+      "points" : 4
+    } ],
+    "recommendation" : "Do not open, click, or interact with this content. Severe risk indicators identified.",
+    "error" : null,
+    "durationMs" : 16,
+    "ts" : 1795041639915
+  }, {
+    "id" : "5",
+    "inputType" : "url",
+    "input" : "http://www.example-news-blog.org/articles/guide.html",
+    "riskLevel" : "Medium",
+    "risk" : "medium",
+    "state" : "THREAT",
+    "score" : 30,
+    "status" : "verified",
+    "category" : "Medium Risk Suspicious Pattern",
+    "details" : "Uses unencrypted HTTP protocol",
+    "reasons" : [ "Uses unencrypted HTTP protocol" ],
+    "triggeredRules" : [ {
+      "id" : "http_protocol",
+      "description" : "Uses unencrypted HTTP protocol",
+      "points" : 2
+    } ],
+    "recommendation" : "Exercise caution. Verify source before proceeding or sharing credentials.",
+    "error" : null,
+    "durationMs" : 16,
+    "ts" : 1795041640133
+  }, {
+    "id" : "4",
+    "inputType" : "url",
+    "input" : "http://user:token@secure-portal.net/auth",
+    "riskLevel" : "High",
+    "risk" : "high",
+    "state" : "THREAT",
+    "score" : 99,
+    "status" : "verified",
+    "category" : "High Risk Threat Detected",
+    "details" : "Uses unencrypted HTTP protocol; Contains @ symbol in authority section (user credentials spoofing); Hostname contains 2 suspicious keyword(s)",
+    "reasons" : [ "Uses unencrypted HTTP protocol", "Contains @ symbol in authority section (user credentials spoofing)", "Hostname contains 2 suspicious keyword(s)" ],
+    "triggeredRules" : [ {
+      "id" : "http_protocol",
+      "description" : "Uses unencrypted HTTP protocol",
+      "points" : 2
+    }, {
+      "id" : "authority_userinfo",
+      "description" : "Contains @ symbol in authority section (user credentials spoofing)",
+      "points" : 4
+    }, {
+      "id" : "suspicious_keyword",
+      "description" : "Hostname contains 2 suspicious keyword(s)",
+      "points" : 2
+    } ],
+    "recommendation" : "Do not open, click, or interact with this content. Severe risk indicators identified.",
+    "error" : null,
+    "durationMs" : 16,
+    "ts" : 1795041640134
+  }, {
+    "id" : "3",
+    "inputType" : "url",
+    "input" : "http://brand.account-security.example-portal.net/login",
+    "riskLevel" : "High",
+    "risk" : "high",
+    "state" : "THREAT",
+    "score" : 99,
+    "status" : "verified",
+    "category" : "High Risk Threat Detected",
+    "details" : "Uses unencrypted HTTP protocol; Multiple nested subdomains and misleading domain structure; Hostname contains 2 suspicious keyword(s)",
+    "reasons" : [ "Uses unencrypted HTTP protocol", "Multiple nested subdomains and misleading domain structure", "Hostname contains 2 suspicious keyword(s)" ],
+    "triggeredRules" : [ {
+      "id" : "http_protocol",
+      "description" : "Uses unencrypted HTTP protocol",
+      "points" : 2
+    }, {
+      "id" : "nested_subdomains",
+      "description" : "Multiple nested subdomains and misleading domain structure",
+      "points" : 3
+    }, {
+      "id" : "suspicious_keyword",
+      "description" : "Hostname contains 2 suspicious keyword(s)",
+      "points" : 2
+    } ],
+    "recommendation" : "Do not open, click, or interact with this content. Severe risk indicators identified.",
+    "error" : null,
+    "durationMs" : 17,
+    "ts" : 1795041640136
+  }, {
+    "id" : "6",
+    "inputType" : "message",
+    "input" : "Your lab appointment is confirmed for tomorrow at 2:00 PM. Reply 1 to confirm.",
+    "riskLevel" : "Low",
+    "risk" : "low",
+    "state" : "SAFE",
+    "score" : 15,
+    "status" : "verified",
+    "category" : "Legitimate Message",
+    "details" : "Vague or unsolicited action request",
+    "reasons" : [ "Vague or unsolicited action request" ],
+    "triggeredRules" : [ {
+      "id" : "action_request",
+      "description" : "Vague or unsolicited action request",
+      "points" : 1
+    } ],
+    "recommendation" : "Standard precautions apply. No immediate risk indicators found.",
+    "error" : null,
+    "durationMs" : 5,
+    "ts" : 1795041640137
+  }, {
+    "id" : "7",
+    "inputType" : "message",
+    "input" : "Notice: Account verification required within 24 hours. Visit http://192.168.1.50/verify to prevent suspension.",
+    "riskLevel" : "High",
+    "risk" : "high",
+    "state" : "THREAT",
+    "score" : 99,
+    "status" : "verified",
+    "category" : "High Risk Threat Detected",
+    "details" : "Urgent time window or pressure tactic detected; Account suspension threat or penalty warning; Message references user account or security credentials; Embedded URL: Uses unencrypted HTTP protocol; Embedded URL: Hostname is a raw IP address instead of a domain name",
+    "reasons" : [ "Urgent time window or pressure tactic detected", "Account suspension threat or penalty warning", "Message references user account or security credentials", "Embedded URL: Uses unencrypted HTTP protocol", "Embedded URL: Hostname is a raw IP address instead of a domain name" ],
+    "triggeredRules" : [ {
+      "id" : "urgency_language",
+      "description" : "Urgent time window or pressure tactic detected",
+      "points" : 2
+    }, {
+      "id" : "suspension_threat",
+      "description" : "Account suspension threat or penalty warning",
+      "points" : 3
+    }, {
+      "id" : "account_reference",
+      "description" : "Message references user account or security credentials",
+      "points" : 1
+    }, {
+      "id" : "embedded_http_protocol",
+      "description" : "Embedded URL: Uses unencrypted HTTP protocol",
+      "points" : 2
+    }, {
+      "id" : "embedded_ip_host",
+      "description" : "Embedded URL: Hostname is a raw IP address instead of a domain name",
+      "points" : 4
+    } ],
+    "recommendation" : "Do not open, click, or interact with this content. Severe risk indicators identified.",
+    "error" : null,
+    "durationMs" : 5,
+    "ts" : 1795041640138
+  }, {
+    "id" : "8",
+    "inputType" : "message",
+    "input" : "Please review your weekly account digest and notification settings.",
+    "riskLevel" : "Medium",
+    "risk" : "medium",
+    "state" : "THREAT",
+    "score" : 30,
+    "status" : "verified",
+    "category" : "Medium Risk Suspicious Pattern",
+    "details" : "Vague or unsolicited action request; Message references user account or security credentials",
+    "reasons" : [ "Vague or unsolicited action request", "Message references user account or security credentials" ],
+    "triggeredRules" : [ {
+      "id" : "action_request",
+      "description" : "Vague or unsolicited action request",
+      "points" : 1
+    }, {
+      "id" : "account_reference",
+      "description" : "Message references user account or security credentials",
+      "points" : 1
+    } ],
+    "recommendation" : "Exercise caution. Verify source before proceeding or sharing credentials.",
+    "error" : null,
+    "durationMs" : 3,
+    "ts" : 1795041640140
+  }, {
+    "id" : "1",
+    "inputType" : "url",
+    "input" : "https://www.example.edu/courses/cs302",
+    "riskLevel" : "Low",
+    "risk" : "low",
+    "state" : "SAFE",
+    "score" : 12,
+    "status" : "verified",
+    "category" : "Legitimate URL",
+    "details" : "Valid protocol and standard structure; clean inspection.",
+    "reasons" : [ "No suspicious heuristic patterns detected." ],
+    "triggeredRules" : [ ],
+    "recommendation" : "Standard precautions apply. No immediate risk indicators found.",
+    "error" : null,
+    "durationMs" : 0,
+    "ts" : 1795041640141
+  }, {
+    "id" : "10",
+    "inputType" : "message",
+    "input" : "",
+    "riskLevel" : "NotVerified",
+    "risk" : "unverified",
+    "state" : "NOT_VERIFIED",
+    "score" : null,
+    "status" : "not_verified",
+    "category" : "Not Verified",
+    "details" : "Input is empty",
+    "reasons" : [ "Input is empty" ],
+    "triggeredRules" : [ ],
+    "recommendation" : "Unable to complete inspection safely. Treat as untrusted and do not proceed.",
+    "error" : {
+      "kind" : "EmptyInput",
+      "message" : "Input is empty"
+    },
+    "durationMs" : 1,
+    "ts" : 1795041640144
+  }, {
+    "id" : "9",
+    "inputType" : "url",
+    "input" : "ht!tp://invalid_url_format.com/test",
+    "riskLevel" : "NotVerified",
+    "risk" : "unverified",
+    "state" : "NOT_VERIFIED",
+    "score" : null,
+    "status" : "not_verified",
+    "category" : "Not Verified",
+    "details" : "Malformed URL format: relative URL without a base",
+    "reasons" : [ "Malformed URL format: relative URL without a base" ],
+    "triggeredRules" : [ ],
+    "recommendation" : "Unable to complete inspection safely. Treat as untrusted and do not proceed.",
+    "error" : {
+      "kind" : "MalformedUrl(\"relative URL without a base\")",
+      "message" : "Malformed URL format: relative URL without a base"
+    },
+    "durationMs" : 6,
+    "ts" : 1795041640146
+  } ]
+}

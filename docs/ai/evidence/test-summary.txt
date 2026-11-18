@@ -1,0 +1,14 @@
+﻿JUnit summary - generated from core/target/surefire-reports
+
+com.dac.threatdetector.core.DatasetTest                 tests=1 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.engine.BatchRegistryTest    tests=1 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.engine.EngineConcurrencyTest tests=3 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.engine.EngineTest           tests=4 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.engine.InvariantsTest       tests=2 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.InputTypeWireTest           tests=2 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.ParityTest                  tests=1 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.service.CsvParserTest       tests=9 failures=0 errors=0 skipped=0
+com.dac.threatdetector.core.service.UrlRulesTest        tests=8 failures=0 errors=0 skipped=0
+
+TOTAL tests=31 failures=0 errors=0 skipped=0
+Golden inputs: 562
