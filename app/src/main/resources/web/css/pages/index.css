@@ -1,0 +1,293 @@
+
+
+/* ===== /DAC SHARED CORE (CSS) ===== */
+/* ===== PAGE CSS — dashboard (.dash-* / ID-scoped; tokens only) ===== */
+.dash-main{display:grid;gap:var(--space-5);padding:var(--space-5) var(--space-4) var(--space-8);max-width:1360px;margin:0 auto}
+.dash-layout{display:grid;gap:var(--space-5);grid-template-columns:minmax(0,1fr)}
+.dash-layout > *{min-width:0}
+.dash-col{display:grid;gap:var(--space-5);align-content:start}
+.dash-col > *{min-width:0}
+@media (min-width:1100px){
+  /* [C] sticky within the two-column row only; a card taller than the viewport
+     scrolls internally instead of losing its top/foot to the sticky header. */
+  .dash-layout{grid-template-columns:minmax(0,1fr) 320px;gap:var(--space-6);align-items:start}
+  .dash-aside{position:sticky;top:calc(var(--navbar-h) + 16px);align-self:start;max-height:calc(100vh - var(--navbar-h) - 32px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+}
+
+/* Hero */
+#hero{position:relative;isolation:isolate;overflow:hidden;border-radius:var(--radius-lg);background:var(--bg-card);border:1px solid var(--border);box-shadow:var(--shadow);padding:var(--space-6) var(--space-5)}
+#hero::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent);box-shadow:0 0 24px var(--glow)}
+#hero .dash-hero-in{position:relative;z-index:2;max-width:52ch}
+#hero h1{margin:0 0 var(--space-2);font-size:2.05em;line-height:1.15;letter-spacing:-.01em;color:var(--text)}
+#hero .dash-hl{color:var(--accent)}
+#hero .dash-sub{margin:0;color:var(--text-muted);font-size:1em}
+#hero .hero-art{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;border-radius:inherit}
+#hero .grid-layer{position:absolute;inset:0;width:100%;height:100%;opacity:.6}
+#hero .grid-layer path{stroke:var(--border)}
+#hero .mountain-layer{position:absolute;left:0;right:0;bottom:-2px;width:100%;height:auto;display:block}
+#hero .dash-mtn-far{opacity:.85;z-index:1}
+#hero .dash-mtn-near{z-index:1}
+#hero .glitch-block{position:absolute;z-index:1;background:var(--accent-soft);border-radius:3px}
+#hero .glitch-block:nth-of-type(1){top:18%;left:58%;width:26px;height:10px;opacity:.9;transform:rotate(-4deg)}
+#hero .glitch-block:nth-of-type(2){top:34%;left:72%;width:40px;height:7px;opacity:.6;transform:rotate(3deg)}
+#hero .glitch-block:nth-of-type(3){top:46%;left:47%;width:14px;height:14px;opacity:.75}
+#hero .glitch-block:nth-of-type(4){top:62%;left:86%;width:30px;height:6px;opacity:.4;transform:rotate(-6deg)}
+#hero .glitch-block:nth-of-type(5){top:12%;left:88%;width:12px;height:12px;opacity:.5}
+#hero .dash-scroll{position:relative;z-index:2;margin-top:var(--space-4)}
+
+/* Scan card */
+#scan-card .card-title{display:inline-flex;align-items:center;gap:var(--space-2)}
+#scan-card .card-title svg{width:20px;height:20px;color:var(--accent)}
+#scan-card .seg{margin-top:var(--space-4);margin-bottom:var(--space-3)}
+/* [T1] scan panels: ONE visible at a time — each .scan-block is the shared
+   .reveal component (core.css, grid-rows height reveal driven by data-open);
+   the inner element carries the panel surface (bg/border/padding), so a
+   collapsed block contributes zero height and the old "OR" divider is gone.
+   NOTE: no margins on .reveal-inner — a grid item's margin-box would inflate
+   the 0fr collapsed track (the settings reveal cancels its pad the same way);
+   the gap between seg and panels lives on the seg's margin-bottom instead.
+   [a11y 1.4.3] the old inactive-dim rules are gone with it: a collapsed panel
+   is inert + invisible, so there is no low-contrast visible content left. */
+.scan-panels{display:grid}
+/* the surface (bg/border/padding) lives on a child of .reveal-inner: padding and
+   border on the grid item itself would keep a ~17px min-contribution in the
+   0fr collapsed track (same reason the settings reveal cancels its 3px pad);
+   with an empty-min inner the collapsed track is a true 0 */
+.scan-block > .reveal-inner{min-height:0}
+.scan-surface{background:var(--bg-card-2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-2)}
+.dash-inputwrap{position:relative;margin-top:var(--space-2)}
+.dash-inputwrap .type-icon{position:absolute;left:var(--space-3);top:12px;width:20px;height:20px;color:var(--text-muted);pointer-events:none}
+#scan-input{width:100%;padding-left:42px;resize:none;overflow-y:auto;min-height:44px;max-height:160px}
+.dash-actions{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-3)}
+.dash-drop-inner{display:grid;justify-items:center;gap:var(--space-1);text-align:center;padding:var(--space-5) var(--space-4)}
+.dash-drop-inner svg{width:26px;height:26px;color:var(--accent)}
+.dash-drop-b{font-weight:600;color:var(--text)}
+#csv-drop{margin-top:var(--space-3);cursor:pointer}
+.dash-filecard{margin-top:var(--space-3);border:1px solid var(--border);border-radius:var(--radius);background:var(--bg-card-2);padding:var(--space-3) var(--space-4);display:grid;gap:var(--space-2)}
+.dash-filecard-row{display:flex;align-items:center;gap:var(--space-2);min-width:0}
+.dash-filecard-row svg{width:18px;height:18px;color:var(--accent);flex:none}
+.dash-filemeta{color:var(--text-muted)}
+.dash-progress-label{display:flex;justify-content:space-between;gap:var(--space-2)}
+.dash-footrow{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-top:var(--space-3)}
+.dash-callout{margin-top:var(--space-3)}
+.dash-callout svg{width:16px;height:16px;flex:none}
+.field-error{margin-top:var(--space-2)}
+#csv-error{margin-top:var(--space-2)}
+
+/* Result panel */
+#result-panel{position:relative}
+#scan-card, #result-panel, #scan-progress-zone{scroll-margin-top:84px} /* keep scrolled targets clear of the sticky header */
+
+/* --- Scan-in-progress progress cluster (SPEC 7.3, inside #result-panel) --- */
+.scan-progress-zone {
+  margin-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  outline: none; /* focusable scroll target for AT anchoring, not keyboard focus */
+}
+.scan-progress.is-indet .progress-bar {
+  transform-origin: center;
+  animation: scan-sweep 1.15s ease-in-out infinite; /* transform/opacity only (§12) */
+}
+@keyframes scan-sweep {
+  0%   { transform: translateX(-102%) scaleX(0.42); opacity: 0.55; }
+  55%  { opacity: 1; }
+  100% { transform: translateX(102%) scaleX(0.42); opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scan-progress.is-indet .progress-bar { animation: none !important; transform: scaleX(0.35); opacity: 0.5; }
+}
+[data-motion="reduced"] .scan-progress.is-indet .progress-bar { animation: none !important; transform: scaleX(0.35); opacity: 0.5; }
+/* Result-card styles moved to css/components/verdict-card.css (.verdict-card
+   selectors; the dashboard panel carries that class via #result-panel). */
+.dash-visual{margin:0 auto var(--space-3)}
+.dash-scan-dots span{opacity:.2;animation:dashDot 1.2s ease-in-out infinite}
+.dash-scan-dots span:nth-of-type(2){animation-delay:.2s}
+.dash-scan-dots span:nth-of-type(3){animation-delay:.4s}
+@keyframes dashDot{0%,60%,100%{opacity:.2}30%{opacity:1}}
+.scan-substatus{margin-top:var(--space-2)}
+/* Heading/label/row styles for the verdict card moved to
+   css/components/verdict-card.css (.verdict-card selectors). */
+.dash-batch-link{margin:var(--space-3) 0 0}
+
+/* [T2b] batch rows — scrollable per-row verdict list, one row per CSV entry in
+   file order. Each row is its own bordered, risk-tinted block (fix-2 redesign).
+   The list scrolls internally (max-height, thin scrollbar like .modal-body) so
+   the result panel keeps a bounded height; rows carry content-visibility so
+   off-screen rows of a 5,000-row batch cost little. Indicators: scored ring
+   (lazy), static green check for Low, dashed neutral ring for Not Verified /
+   Error — never a green tint or a percentage on a row that was not verified. */
+.batch-list{list-style:none;margin:var(--space-3) 0 0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-2);max-height:21em;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
+.batch-list::-webkit-scrollbar{width:10px}
+.batch-list::-webkit-scrollbar-track{background:transparent}
+.batch-list::-webkit-scrollbar-thumb{border:3px solid transparent;border-radius:999px;background-color:var(--border-strong);background-clip:padding-box}
+/* risk mapping per row: --risk-rgb keeps the border tint at engine defaults
+   (borders/rings/text do not change); --risk-color feeds the left gradient
+   and follows the --vs-* verdict shades, as the user sketch asked. */
+.batch-row[data-risk="low"]{--risk-rgb:var(--risk-low-rgb);--risk-color:var(--vs-low)}
+.batch-row[data-risk="medium"]{--risk-rgb:var(--risk-medium-rgb);--risk-color:var(--vs-medium)}
+.batch-row[data-risk="high"]{--risk-rgb:var(--risk-high-rgb);--risk-color:var(--vs-high)}
+.batch-row[data-risk="unverified"]{--risk-rgb:var(--risk-unverified-rgb);--risk-color:var(--vs-unverified)}
+.batch-row[data-risk="na"]{--risk-rgb:var(--risk-unverified-rgb);--risk-color:var(--vs-unverified)}
+.batch-row{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-2) var(--space-3);border:1px solid color-mix(in srgb, var(--border) 75%, rgb(var(--risk-rgb, 138 147 160)) 25%);border-radius:var(--radius);background-color:var(--bg-card);background-image:linear-gradient(to left, color-mix(in srgb, var(--risk-color, var(--na)) 10%, transparent), transparent 65%);content-visibility:auto;contain-intrinsic-size:auto 5em}
+.batch-row-main{flex:1 1 auto;min-width:0}
+.batch-row-top{display:flex;align-items:baseline;gap:var(--space-3);min-width:0}
+.batch-row .risk-label{white-space:nowrap}
+.batch-row-input{flex:1 1 auto;min-width:0;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-row-sub{margin:2px 0 0;color:var(--text-faint);font-size:.9em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.batch-row-ind{flex:none;width:2.9em;height:2.9em;display:inline-flex;align-items:center;justify-content:center}
+.batch-list .ring-wrap,.batch-list .unv-ring{--ring-size:2.9em}
+.row-check{color:var(--low)}
+.row-check svg{width:2.9em;height:2.9em} /* same slot as the batch % wheels */
+/* draw-on like the % wheels: circle sweeps in, then the tick; the shared row
+   IO adds .is-drawn when the row scrolls into view (r=10.05 → C≈63.2,
+   mark length ≈12.5 in the 24 box). Paint-only SVG props, no layout. */
+.row-check .chk-circle{stroke-dasharray:63.2;stroke-dashoffset:63.2;transition:stroke-dashoffset 750ms var(--ease-out) 60ms}
+.row-check .chk-mark{stroke-dasharray:12.5;stroke-dashoffset:12.5;transition:stroke-dashoffset 350ms var(--ease-out) 520ms}
+.row-check.is-drawn .chk-circle,.row-check.is-drawn .chk-mark{stroke-dashoffset:0}
+html[data-motion="reduced"] .row-check .chk-circle,html[data-motion="reduced"] .row-check .chk-mark{transition:none;stroke-dashoffset:0}
+@media (prefers-reduced-motion:reduce){.row-check .chk-circle,.row-check .chk-mark{transition:none;stroke-dashoffset:0}}
+.batch-row-open{flex:none;display:inline-flex;align-items:center;gap:var(--space-1);padding:.25em .7em;border:1px solid var(--border-strong);border-radius:var(--radius-pill);font-size:.85em;background:var(--bg-card);color:var(--text);cursor:pointer}
+.batch-row-open:hover{background:var(--accent-soft)}
+.batch-row-open:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.batch-row-open .btn-arrow{width:.9em;height:.9em;flex:none}
+.batch-row-open .btn-label{white-space:nowrap}
+@media (max-width:480px){.batch-row-open .btn-label{display:none}}
+/* arrow is small-screen-only: wide rows show the "View details" text alone */
+@media (min-width:481px){.batch-row-open .btn-arrow{display:none}}
+/* batch header (red-box redesign) */
+.batch-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap}
+.batch-head-left{display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap;min-width:0}
+.batch-head-left h3{margin:0;font-size:1.05em}
+.batch-head-left .muted{margin:0}
+.batch-tally{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap}
+.batch-tally-item{display:inline-flex;align-items:center;gap:var(--space-1)}
+.batch-tally-dot{width:.5em;height:.5em;border-radius:50%;flex:none}
+.batch-tally-dot[data-risk="low"]{background:rgb(var(--risk-low-rgb))}
+.batch-tally-dot[data-risk="medium"]{background:rgb(var(--risk-medium-rgb))}
+.batch-tally-dot[data-risk="high"]{background:rgb(var(--risk-high-rgb))}
+.batch-tally-dot[data-risk="unverified"]{background:rgb(var(--risk-unverified-rgb))}
+.batch-tally-item strong{font-weight:700}
+.batch-tally-label{color:var(--text-muted)}
+.batch-divider{border:0;border-top:1px solid var(--border);margin:var(--space-3) 0}
+/* capped stagger on entry (rows 21+ all land at 240ms); governor/media kill it */
+html[data-motion="full"] .batch-row{opacity:0;animation:dashRise var(--dur-in) var(--ease-out) forwards;animation-delay:calc(var(--row-i,0)*12ms)}
+[data-motion="reduced"] .batch-row{animation:none;opacity:1}
+@media (prefers-reduced-motion:reduce){.batch-row{animation:none;opacity:1}}
+/* Safe-state styles + card motion moved to css/components/verdict-card.css. */
+[data-motion="reduced"] .dash-scan-dots{display:none}
+[data-motion="reduced"] .scan-substatus{display:none}
+@media (prefers-reduced-motion:reduce){.dash-scan-dots{display:none}.scan-substatus{display:none}}
+
+/* Table card — [D] flex head row, [B] truncating cells */
+.results-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);flex-wrap:wrap}
+#results-card{container-type:inline-size}
+#results-card .card-title{display:inline-flex;align-items:center;gap:var(--space-2)}
+#results-card .card-title svg{width:20px;height:20px;color:var(--accent);flex:none}
+.link-ghost{border:1px solid var(--border-strong);border-radius:var(--radius);padding:0 var(--space-3)}
+#table-results .type-icon{width:18px;height:18px;flex:none;color:var(--text-muted)}
+#table-results .time-cell{white-space:nowrap}
+#table-results tbody tr{cursor:pointer;transition:background var(--dur-fast) var(--ease-out)}
+#table-results tbody tr:hover{background:var(--bg-card-2)}
+#table-results tbody tr.is-highlight{background:var(--accent-soft)}
+#table-results tbody tr:focus-visible{outline:2px solid var(--focus-ring);outline-offset:-2px}
+.status-line svg{width:12px;height:12px;flex:none}
+/* [B] Input cell: 16-18px icon (flex:none) + one-line truncating text + title tooltip,
+   icon vertically centered. Details clamp to 2 lines. */
+#table-results td.dash-td-input{display:flex;align-items:center;gap:var(--space-2);min-width:0}
+#table-results td.dash-td-input .text-truncate{flex:1 1 auto;min-width:0}
+.text-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-width:0}
+/* [B] stacked card rows when the results card is narrow (container) … */
+@container (max-width:759.98px){
+  #table-results thead{display:none}
+  #table-results,#table-results tbody,#table-results tr,#table-results td{display:block;width:100%}
+  #table-results tr{border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-3);margin-bottom:var(--space-3);background:var(--bg-card-2)}
+  #table-results td{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0}
+  /* [a11y 1.4.3] stacked-row labels: --text-faint dips to 4.29:1 vs --bg-card-2 on
+   dark-bg=grey; --text-muted passes on every surface, so labels use it here. */
+  #table-results td::before{content:attr(data-label);flex:none;width:88px;color:var(--text-muted);font-size:.75em;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  #table-results td.dash-td-input::before{display:none}
+}
+/* … with a media-query fallback for engines without container queries */
+@media (max-width:639.98px){
+  #table-results thead{display:none}
+  #table-results,#table-results tbody,#table-results tr,#table-results td{display:block;width:100%}
+  #table-results tr{border:1px solid var(--border);border-radius:var(--radius);padding:var(--space-3);margin-bottom:var(--space-3);background:var(--bg-card-2)}
+  #table-results td{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-1) 0}
+  #table-results td::before{content:attr(data-label);flex:none;width:88px;color:var(--text-muted);font-size:.75em;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  #table-results td.dash-td-input::before{display:none}
+}
+/* [B2] desktop table mode: the Input cell is a flex box, so its own bottom
+   border paints mid-air when Details wraps to two lines. td borders off; the
+   row paints one continuous divider (collapsed borders span the full row).
+   Stacked card rows (container ≤759.98 / media ≤639.98) keep td dividers. */
+@container (min-width:760px){
+  #table-results td{border-bottom:0}
+  #table-results tbody tr{border-bottom:1px solid var(--border)}
+  #table-results th,#table-results td{padding-left:var(--space-4);padding-right:var(--space-4)}
+}
+
+/* [T3] empty state for the Analysis Results card — same data source as the
+   table (DAC.history via rebuildTable); shown only when the table has no rows. */
+.dash-results-empty{display:grid;justify-items:center;gap:var(--space-1);text-align:center;padding:var(--space-6) 0;color:var(--text-muted)}
+.dash-results-empty-ico{width:30px;height:30px;color:var(--text-faint)}
+.dash-results-empty h3{margin:var(--space-2) 0 0;color:var(--text)}
+.dash-results-empty p{margin:0;font-size:.95em}
+.dash-results-empty{transition:opacity var(--dur-out) var(--ease-out)}
+.dash-results-empty.is-leaving{opacity:0}
+html[data-motion="full"] .dash-results-empty:not([hidden]){animation:dashRise var(--dur-in) var(--ease-out)}
+html[data-motion="full"] #table-results.is-entering{animation:dashRise var(--dur-in) var(--ease-out)}
+@media (prefers-reduced-motion:reduce){.dash-results-empty{animation:none;transition:none}#table-results.is-entering{animation:none}}
+[data-motion="reduced"] .dash-results-empty{animation:none;transition:none}
+[data-motion="reduced"] #table-results.is-entering{animation:none}
+
+/* Summary card */
+#summary-card{position:relative;overflow:hidden;cursor:pointer}
+#summary-card .card-title{display:inline-flex;align-items:center;gap:var(--space-2)}
+#summary-card .card-title svg{width:20px;height:20px;color:var(--accent)}
+.dash-summary-visual{position:relative;display:grid;justify-items:center;padding:var(--space-5) 0 64px} /* [A2] clears the 42px wave band (bottom 8 + 42 + slack) */
+#summary-card .wave-deco{position:absolute;left:0;right:0;bottom:var(--space-2);width:100%;height:42px;margin:auto}
+#summary-card .wave-deco path{stroke:var(--accent)}
+.dash-state-title{margin:0;font-size:1.2em;font-weight:700;text-align:center}
+.dash-state-title[data-state="secure"]{color:var(--low)}
+.dash-state-title[data-state="caution"]{color:var(--medium)}
+.dash-state-title[data-state="threat"]{color:var(--high)}
+.dash-state-desc{margin:var(--space-1) 0 0;text-align:center;color:var(--text-muted)}
+/* [A1] stats: equal 3-col grid; labels never wrap; numbers share a baseline (subgrid,
+   with a min-height fallback so all three stat bottoms stay within ±1px) */
+.dash-stats{margin:var(--space-4) 0 0;padding:var(--space-3) 0 0;border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-2);list-style:none}
+.dash-stat{margin:0;min-height:2lh}
+@supports (grid-template-rows: subgrid){.dash-stats{grid-template-rows:auto auto}.dash-stat{display:grid;grid-template-rows:subgrid;grid-row:span 2;min-height:0}}
+/* [T7] labels wrap instead of truncating (SCANS TOD… at narrow columns); tracking
+   tightened .04em→.02em so the longest label ("MEDIUM RISK") fits one line ≥360px */
+.dash-stat dt{margin:0;color:var(--text-faint);font-size:.75em;font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.dash-stat dd{margin:var(--space-1) 0 0;font-size:1.35em;font-weight:700;line-height:1.15;color:var(--text);font-variant-numeric:tabular-nums}
+.dash-stat dd[data-risk="high"]{color:var(--high)}
+.dash-stat dd[data-risk="medium"]{color:var(--medium)}
+.dash-summary-foot{margin-top:var(--space-4);display:flex;justify-content:center}
+
+/* Page-load stagger (SPEC §12) */
+@media (prefers-reduced-motion:no-preference){
+  html[data-motion="full"] .dash-reveal{opacity:0;animation:dashRise var(--dur-in) var(--ease-out) forwards}
+  html[data-motion="full"] .dash-reveal:nth-child(2){animation-delay:40ms}
+  html[data-motion="full"] .dash-reveal:nth-child(3){animation-delay:80ms}
+  html[data-motion="full"] .dash-reveal:nth-child(4){animation-delay:120ms}
+  html[data-motion="full"] .dash-reveal:nth-child(5){animation-delay:160ms}
+}
+@keyframes dashRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (max-width:479.98px){#hero{padding:var(--space-5) var(--space-4)}}
+
+/* --- Download sample CSV: visible outlined secondary button (allowlist D) ---
+   Rule lives in this page-specific file (post-split). Keeps the .btn base
+   44px touch target, pill radius and focus ring; overrides color/border so
+   the button reads as an outlined secondary action with AA contrast. */
+#btn-download-sample {
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+}
+#btn-download-sample:hover:not(:disabled) {
+  background: var(--bg-card-2);
+  border-color: var(--accent);
+  color: var(--text);
+}

@@ -1,0 +1,118 @@
+/* ==========================================================================
+   risk-glow.css — Agent E (Task 3), reshaped overnight (allowlist B + C)
+   Edge-tinted risk glow keyed to Agent F's data-risk attribute.
+      - index.html card (#result-panel, class .verdict-card): its tint rules
+        (per-state mapping, gradients, masked border overlay) now live in
+        css/components/verdict-card.css — one block shared with the Settings
+        preview. This file still defines the tokens both pages read:
+        --risk-*-rgb engine triplets + --risk-*-a alphas + the --vs-*
+        verdict-shade tokens (docs/VERDICT_COLORS.md), light-scoped for
+        [data-theme-scope] previews.
+      - details modal (.modal-detail — history.html AND the dashboard batch
+      "view details" modal, both share DAC.ui.detailsCard): UI pass 1 adds
+      a SUBTLE tint (Task 2c, per approved sketch) in the ENGINE risk color.
+      It deliberately does NOT follow the --vs-* verdict shades: the shade
+      targets only the dashboard result card.
+   Deliberately NEVER matches: bare [data-risk], .risk-label pills, or the
+   batch mini-pills (data-risk="na") — those keep their existing rules.
+   All colors are rgb(var(--risk-rgb) / ALPHA): --risk-rgb is mapped per state
+   below, and the alphas are tokens (--risk-*-a) so the light theme lowers
+   intensity without touching the recipes. Idle / scanning / error states
+   carry no data-risk attribute and therefore keep today's unglowed look.
+   No layout properties, no border-radius change, no outer drop glow, no
+   animation loops.
+   ========================================================================== */
+
+/* The scope attribute mirrors these tokens onto the verdict-color preview
+   container (Settings picker modal) — same pattern as the core.css blocks. */
+:root,
+[data-theme-scope="dark"] {
+  /* Engine risk colors, dark theme (contract §2.3; mirrors --low/--medium/--high/--na) */
+  --risk-low-rgb: 61 220 132;
+  --risk-medium-rgb: 255 176 32;
+  --risk-high-rgb: 255 90 95;
+  --risk-unverified-rgb: 138 147 160;
+
+  /* Glow alphas, dark theme. Gradient interiors stay <= .25 so body text on
+     --bg-card / dark-grey keeps AA contrast; the masked border overlay hugs
+     the card edges where no body text sits. */
+  --risk-edge-a: .22;   /* right-side gradient (behind the ring side) */
+  --risk-corner-a: .10; /* top-right corner gradient (fade) */
+  --risk-border-a: .35; /* faint tinted 1px border (masked ::after overlay) */
+}
+
+:root[data-theme="light"],
+[data-theme-scope="light"] {
+  /* Light theme — same hue family, lower intensity (contract §2.3) */
+  --risk-low-rgb: 18 122 72;
+  --risk-medium-rgb: 180 83 9;
+  --risk-high-rgb: 194 38 59;
+  --risk-unverified-rgb: 85 96 106;
+
+  /* Light theme — same hue family (contract §2.3). Alphas raised FOUR times
+     after user reports: .12/.06/.25 → .16/.08/.28 (round 2) → .28/.14/.40
+     (round 3) → .34/.20/.46 (round 4) → .50/.30/.55 (round 5: "increase the
+     gradient color strength more... they still feel barely visible" — possibly
+     a bad laptop panel, so this is deliberately bold: a clearly visible tint
+     even on a low-contrast screen). Light now far exceeds dark
+     (.22/.10/.35) ON PURPOSE: white surfaces need much more. Text stays
+     AA-safe (worst case --text on the high tint ≈ 10:1). */
+  --risk-edge-a: .50;
+  --risk-corner-a: .30;
+  --risk-border-a: .55;
+}
+
+/* --- Verdict shade tokens (Phase 1 — docs/VERDICT_COLORS.md) ---------------
+   --vs-<verdict> is the gradient TINT of each verdict state (High / Medium /
+   Low / Not verified); ring, label, border and text colors are untouched.
+   Defaults equal today's colors, so nothing changes visually. The
+   --vs-<verdict>-<theme>-o fallback variables are JS overrides written by
+   DAC.verdictShade (stored in TDSettings as td.vs.<theme>.<verdict>); an
+   absent/removed property falls back to the default, so default theme
+   switching needs no JS. Dark defaults are shared by every dark variant
+   (oled / grey). Keep in sync with the table in docs/VERDICT_COLORS.md. */
+:root {
+  --vs-high:       var(--vs-high-dark-o,       #ff5a5f);
+  --vs-medium:     var(--vs-medium-dark-o,     #ffb020);
+  --vs-low:        var(--vs-low-dark-o,        #3ddc84);
+  --vs-unverified: var(--vs-unverified-dark-o, #8a93a0);
+}
+:root[data-theme="light"] {
+  --vs-high:       var(--vs-high-light-o,       #c2263b);
+  --vs-medium:     var(--vs-medium-light-o,     #b45309);
+  --vs-low:        var(--vs-low-light-o,        #127a48);
+  --vs-unverified: var(--vs-unverified-light-o, #55606a);
+}
+/* The Settings preview scopes the edited theme via [data-theme-scope] (see
+   core.css token blocks). Without this mirror, a light-scoped preview while
+   the app runs dark would fall back to the dark defaults above. */
+[data-theme-scope="light"] {
+  --vs-high:       var(--vs-high-light-o,       #c2263b);
+  --vs-medium:     var(--vs-medium-light-o,     #b45309);
+  --vs-low:        var(--vs-low-light-o,        #127a48);
+  --vs-unverified: var(--vs-unverified-light-o, #55606a);
+}
+
+/* The #result-panel card tint (per-state mapping, gradients, masked border
+   overlay) MOVED to css/components/verdict-card.css as .verdict-card rules —
+   one tint block shared by the dashboard card and the Settings preview. */
+
+/* --- DETAILS MODAL TINT (restored to the pre-verdict-shade default) --------
+   .modal-detail is the shared details body (history page AND dashboard batch
+   "view details" — one builder, one look). Only a soft bottom-right radial
+   in the ENGINE risk color: the History/details modal deliberately does NOT
+   follow the --vs-* verdict shades (user decision — the shade targets only
+   the dashboard result card). --risk-rgb below maps per state from the
+   engine colors; alpha capped at --risk-corner-a (.10 dark / .08 light) so
+   body text keeps AA contrast over the modal surface. Not Verified rows tint
+   with the neutral grey — never green, never a verdict color. Error rows
+   carry NO data-risk attribute (contract §2.2) and stay unglowed. */
+.modal-detail[data-risk="low"]        { --risk-rgb: var(--risk-low-rgb); }
+.modal-detail[data-risk="medium"]     { --risk-rgb: var(--risk-medium-rgb); }
+.modal-detail[data-risk="high"]       { --risk-rgb: var(--risk-high-rgb); }
+.modal-detail[data-risk="unverified"] { --risk-rgb: var(--risk-unverified-rgb); }
+
+.modal-detail[data-risk] {
+  background-image:
+    radial-gradient(85% 120% at 100% 100%, rgb(var(--risk-rgb) / var(--risk-corner-a)), transparent 60%);
+}

@@ -1,0 +1,307 @@
+
+
+/* ===== /DAC SHARED CORE (CSS) ===== */
+/* ===== PAGE CSS: settings (page-owned; tokens only, CONTRACT §4/§16) =====
+   Single raw-hex exception: accent swatch previews (build spec) — see block below. */
+
+.set-wrap { max-width: 860px; margin: 0 auto; padding: var(--space-6) var(--space-4) var(--space-8); display: flex; flex-direction: column; gap: var(--space-5); }
+.set-intro h1 { margin: 0 0 var(--space-1); font-size: 1.6rem; line-height: 1.2; }
+.set-intro p { margin: 0; color: var(--text-muted); font-size: .95rem; }
+
+.set-card { display: flex; flex-direction: column; gap: var(--space-4); }
+.set-card-head { display: flex; flex-direction: column; gap: 2px; }
+.set-card-head .card-title { margin: 0; font-size: 1.05rem; }
+.set-card-sub { margin: 0; color: var(--text-muted); font-size: .88rem; }
+
+.set-field { display: flex; flex-direction: column; gap: var(--space-2); }
+.set-label { font-size: .95rem; font-weight: 600; }
+.set-help { margin: 0; color: var(--text-muted); font-size: .82rem; max-width: 62ch; }
+.set-row { flex-direction: row; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 48px; }
+.row-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.badge-muted { align-self: flex-start; font-size: .72rem; letter-spacing: .02em; color: var(--text-muted); background: var(--bg-card-2); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); padding: 2px 8px; }
+
+/* Generic page focus fallback, then component specifics */
+.set-wrap :focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* [B] Pill hugs its buttons: .set-field is a column-flex box, so its children
+   default to align-self:stretch — pin the control to the start edge instead. */
+.set-field > .seg { align-self: flex-start; }
+
+/* ── Accent swatch previews — THE ONLY raw-hex block permitted on this page.
+   Value = each option's OWN accent per theme, mirrors CONTRACT §4.2, so a swatch
+   previews its color even though another accent is currently active. ── */
+.swatches { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: 2px 0; }
+.sw { position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border-strong); background: transparent; padding: 0; cursor: pointer; }
+/* [D] selection feedback animates via transform+opacity on the pseudos only (no
+   layout shift): the ring moved from box-shadow onto .sw::before so it can
+   fade/scale in, the check mark scales/fades on .sw::after. ~180ms each. */
+.sw::before {
+  content: ""; position: absolute; inset: -5px; border-radius: 50%;
+  border: 2px solid var(--text);
+  box-shadow: inset 0 0 0 2px var(--bg-card);
+  opacity: 0; transform: scale(.7);
+  transition: transform .18s var(--ease-out), opacity .18s var(--ease-out);
+  pointer-events: none;
+}
+.sw::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 5px; height: 9px;
+  border-right: 2px solid var(--sw-check, #FFFFFF);
+  border-bottom: 2px solid var(--sw-check, #FFFFFF);
+  opacity: 0; transform: translate(-60%, -62%) rotate(45deg) scale(.5);
+  transition: transform .18s var(--ease-out), opacity .18s var(--ease-out);
+  pointer-events: none;
+}
+.sw[aria-checked="true"]::before { opacity: 1; transform: scale(1); }
+.sw[aria-checked="true"]::after { opacity: 1; transform: translate(-60%, -62%) rotate(45deg) scale(1); }
+.sw-at[data-ac="green"] { background: #1E7D3C; --sw-check: #FFFFFF; }
+.sw-at[data-ac="blue"] { background: #1B5EA8; --sw-check: #FFFFFF; }
+.sw-at[data-ac="white"] { background: #232A31; --sw-check: #FFFFFF; }
+.sw-at[data-ac="violet"] { background: #5E35B1; --sw-check: #FFFFFF; }
+.sw-at[data-ac="amber"] { background: #7A4C00; --sw-check: #FFFFFF; }
+html[data-theme="dark"] .sw-at[data-ac="green"] { background: #8DEB6B; --sw-check: #07230D; }
+html[data-theme="dark"] .sw-at[data-ac="blue"] { background: #4D94FF; --sw-check: #031431; }
+html[data-theme="dark"] .sw-at[data-ac="white"] { background: #F2F5F7; --sw-check: #0B0E11; }
+html[data-theme="dark"] .sw-at[data-ac="violet"] { background: #B78CFF; --sw-check: #180430; }
+html[data-theme="dark"] .sw-at[data-ac="amber"] { background: #FFC24D; --sw-check: #2B1600; }
+
+/* ── Task 3 [C] — dark-background reveal. UI pass 1 [T1]: the grid 0fr→1fr
+   technique and its timings moved to the shared .reveal / .reveal-inner
+   component (core.css) — this wrapper now carries class="f-darkbg-reveal reveal"
+   and this file only adds what is specific to the field: the collapsed state
+   eats the card flex gap via a negative bottom margin (animated with the same
+   reveal durations), and the inner field keeps a 3px padding offset by an equal
+   negative margin, so focus outlines and the thumb shadow never clip at the
+   animated edge. NOTE: the transition lists below restate the shared rows+opacity
+   transitions — a later-in-cascade `transition` would otherwise REPLACE the
+   component's list (transition is not additive), so the three properties must
+   travel together. The global reduced-motion kill-switches flatten everything. */
+.f-darkbg-reveal {
+  margin-bottom: calc(-1 * var(--space-4)); /* collapsed: eats the card flex gap */
+  transition: grid-template-rows var(--dur-reveal-out, .25s) var(--ease-out),
+              opacity var(--dur-reveal-out, .25s) var(--ease-out),
+              margin-bottom var(--dur-reveal-out, .25s) var(--ease-out);
+}
+.f-darkbg-reveal[data-open="true"] {
+  margin-bottom: 0;
+  transition: grid-template-rows var(--dur-reveal-in, .4s) var(--ease-out),
+              opacity var(--dur-reveal-in, .4s) var(--ease-out),
+              margin-bottom var(--dur-reveal-in, .4s) var(--ease-out);
+}
+.f-darkbg-reveal > .f-darkbg {
+  padding: 3px;
+  margin: -3px;
+}
+/* Pills settle from translateY(-8px) with a --i-driven 40ms stagger (expand 400ms /
+   collapse 250ms). The full transition list mirrors the page micro-transition rule
+   so nothing else on these pills changes; thumb/selection rules stay untouched. */
+#set-darkbg .seg__opt {
+  transform: translateY(-8px);
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              transform .25s var(--ease-out);
+  transition-delay: 0ms, 0ms, 0ms, 0ms, calc(var(--i, 0) * 40ms);
+}
+html[data-theme="dark"] #set-darkbg .seg__opt {
+  transform: translateY(0);
+  transition-duration: var(--dur-fast), var(--dur-fast), var(--dur-fast), var(--dur-fast), .4s;
+}
+
+/* ── Task 3 [C] — "Navbar selected style" live preview: a decorative miniature of
+   the real navbar, keyed on html[data-nav-style] exactly like nav.css and built
+   from this page's tokens; never interactive. Modes: Ring (accent ring + glow on
+   the current button) and Contrast (formerly labelled "Invert" — stored legacy
+   value "invert" is accepted and normalized by js/settings.js). */
+.nav-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  pointer-events: none;
+  user-select: none;
+}
+.nav-preview__btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--navlink-bg);
+  color: var(--navlink-icon);
+  box-shadow: 0 0 0 1px var(--navlink-ring);
+  transition: background-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast),
+              box-shadow var(--dur-fast) var(--ease-out),
+              outline-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.nav-preview__btn svg { width: 16px; height: 16px; display: block; }
+.nav-preview__btn[data-current] {
+  color: var(--navlink-icon-current);
+  outline: 2px solid var(--navlink-ring-current);
+  outline-offset: 2px;
+  box-shadow: 0 0 10px var(--glow);
+}
+/* Contrast mode (the option was formerly labelled "Invert"; stored legacy value
+   "invert" is normalized by js/settings.js — both attribute values are matched
+   here as belt-and-braces, same as nav.css): mirror of the real navbar's
+   treatment. The accent ring drops and the current button becomes the inverted
+   filled circle (--navlink-bg / --navlink-icon swapped) with the thin
+   --border-strong edge and the same tuned scale as nav.css; the transparent
+   outline keeps box metrics stable, so nothing shifts when the mode toggles. */
+html[data-nav-style="contrast"] .nav-preview__btn[data-current],
+html[data-nav-style="invert"] .nav-preview__btn[data-current] {
+  background: var(--navlink-icon);
+  color: var(--navlink-bg);
+  outline-color: transparent;
+  box-shadow: 0 0 0 2px var(--border-strong);
+  transform: scale(1.0833);
+}
+
+/* List editors */
+.l-add { display: flex; gap: var(--space-2); }
+.l-add .input { flex: 1 1 auto; min-width: 0; min-height: 44px; }
+.l-add .btn { min-height: 44px; }
+.chip-list { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip-x { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; color: var(--text-muted); background: transparent; border: 0; padding: 0; cursor: pointer; position: relative; }
+.chip-x::before { content: ""; position: absolute; inset: -6px; } /* invisible 44px hit target */
+.chip-x:hover { color: var(--text); background: var(--bg-input); }
+.chip-x svg { display: block; }
+.chip-empty { color: var(--text-faint); font-size: .85rem; align-self: center; }
+
+/* Buttons */
+.set-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.set-actions .btn { min-height: 44px; }
+
+/* About card */
+.about-line { margin: 0; font-weight: 600; }
+.about-copy { margin: 0; color: var(--text-muted); max-width: 62ch; }
+
+/* Motion: micro transitions only; kill under reduced motion (OS or Settings) */
+html[data-motion="reduced"] .set-wrap *, html[data-motion="reduced"] .set-wrap *::before, html[data-motion="reduced"] .set-wrap *::after { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .set-wrap *, .set-wrap *::before, .set-wrap *::after { transition: none !important; }
+}
+
+/* ===== Verdict colors (Phase 3 — docs/VERDICT_COLORS.md) =====
+   Swatch rows, the shared-modal picker body and its preview. Colors come from
+   tokens only; the preview cards read --vs-<verdict> inline from the preview
+   container, which also carries [data-theme-scope] (core.css mirrors the theme
+   token blocks onto it). Page-owned: the picker modal only exists here. */
+
+/* Section swatches — same circle treatment as the accent .sw rows */
+.vs-swatches { display: flex; flex-wrap: wrap; gap: var(--space-3); padding: 2px 0; }
+.vs-swatch {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--border-strong); background: transparent; padding: 0; cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.vs-swatch:hover { transform: scale(1.06); box-shadow: 0 0 0 3px var(--accent-soft); }
+.vs-swatch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* Wider shell for the two-column picker modal (page-owned override of .modal).
+   At 1000px the 1.2fr/1fr grid below puts the preview column at ~505px — the
+   ~500px card the sketch asks for. */
+.modal-vs { width: min(1000px, 100%); }
+
+/* Picker modal body: two columns on wide screens, stacked ≤639.98px */
+.vs-modal { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(240px, 1fr); gap: var(--space-5); align-items: start; }
+@media (max-width: 639.98px) {
+  .vs-modal { grid-template-columns: 1fr; }
+}
+.vs-preview-col, .vs-controls-col { min-width: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+/* User r6/r7: Reset/Apply sit on the LEFT edge, directly under the
+   Current/Selected dot rows; the shade picker (square + hex input) shares
+   that same left edge — the brief r6 centering was moved left in r7 ("move
+   the color selector square with the hex input slightly to the left too to
+   be aligning with current selected and the buttons"). No rule needed for
+   the picker: the column's default stretch left-aligns it (its max-width
+   caps the square at 320px). Scoped to the picker modal. */
+/* Sketch round 2: "the other verdicts:" is a prominent bold heading, not a
+   muted caption. */
+.vs-side-label { margin: 0; font-size: .92rem; font-weight: 700; color: var(--text); }
+
+/* User r4-r7: Apply/Reset sizing + placement. r4 "exact same size" -> equal
+   halves (rejected as too wide in r5); r5 "their exact previous width" ->
+   fixed 96x44, compact AND exactly equal at any label length; r6 pushed to
+   the left under the dots; r7 "give the buttons top margins some space" ->
+   extra 12px above the row (on top of the column's 12px gap). Scoped to
+   the picker modal. */
+.modal-vs .set-actions { flex-wrap: nowrap; justify-content: flex-start; margin-top: var(--space-3); }
+.modal-vs .set-actions .btn { flex: 0 0 auto; width: 96px; min-width: 0; }
+
+/* Large preview: the REAL verdict card (card result-panel verdict-card, from
+   TD.components.verdictCard + css/components/verdict-card.css) on the edited
+   theme's surface. Structure and styles come from the shared component;
+   nothing is faked here. The stacked-state wrapper's height is set by
+   vsSyncHeight (same mechanism as the dashboard's syncHeight). */
+.vs-stage { position: relative; }
+
+/* Sketch round 2 / user round 3 — the thumbs are mini copies of the big
+   preview: same compact card, same layout width (the stage's), same
+   >=600px treatment (ring parked top-right beside the content via
+   padding-right:132px from css/components/verdict-card.css — no 108px
+   strip), ring/check visual mounted. Only the rows-stack override below
+   is shared (core.css lays .detail-rows out as max-content 1fr). */
+.vs-modal .vs-stage .verdict-card .detail-rows,
+.vs-modal .vs-thumb .verdict-card .detail-rows { grid-template-columns: minmax(0, 1fr); }
+
+/* Cross-fade on verdict switch (transform + opacity only, ~200ms; the reduced
+   motion kill below makes it instant) */
+.vs-card { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+.vs-card.vs-enter { opacity: 0; transform: translateY(6px); }
+.vs-card.vs-leave {
+  position: absolute; left: 0; right: 0; top: 0;
+  opacity: 0; transform: translateY(-4px);
+  pointer-events: none;
+}
+
+/* Thumbnails: small real renders of the shared card — the card is laid out
+   at the .vs-stage width by JS (settings.js), then transform:scale() shrinks
+   it into the shot wrapper. Always exactly 3 thumbs (the three verdicts that
+   are not selected) in three equal columns — shrink-to-fit, never a
+   scrollbar; JS derives the scale from the measured cell and gives every
+   card the tallest state's height, so all thumbs are identical in size. The
+   wrapper clips overflow and blocks interaction; the verdict title stays
+   visible text. */
+.vs-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); align-items: start; }
+.vs-thumb {
+  display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2);
+  padding: var(--space-2); min-width: 0;
+  font: inherit; text-align: start; color: var(--text); cursor: pointer;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.vs-thumb:hover { border-color: var(--border-strong); }
+.vs-thumb:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.vs-thumb-shot {
+  display: block; width: 100%; /* one grid cell wide; JS derives the scale */
+  overflow: hidden; pointer-events: none;
+}
+.vs-thumb-shot .verdict-card {
+  /* width + scale come from JS (vsRenderThumbs) so thumbs always match the
+     stage render exactly; only the origin is fixed here */
+  transform-origin: 0 0;
+}
+.vs-thumb-title { font-weight: 600; font-size: .9rem; }
+
+/* Current / Selected color dots */
+.vs-dots { display: flex; flex-direction: column; gap: var(--space-2); }
+.vs-dot-row { display: flex; align-items: center; gap: var(--space-2); font-size: .85rem; color: var(--text-muted); }
+.vs-dot {
+  width: 20px; height: 20px; flex: none; border-radius: 50%;
+  border: 1px solid var(--border-strong); background: transparent;
+}
+
+/* Reduced motion: no cross-fade, no hover pop (OS or Settings kill-switch) */
+html[data-motion="reduced"] .vs-modal *, html[data-motion="reduced"] .vs-swatch { transition: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .vs-modal *, .vs-swatch { transition: none !important; }
+}
