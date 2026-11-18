@@ -29,7 +29,8 @@ and no Low/Safe claim in `InvariantsTest`.
 ## G2 - Every Rust test has a JUnit twin
 
 `cargo test -- --list` in the oracle copy lists 23 Rust tests. All 23 have a
-same-intent JUnit test.
+same-intent JUnit test. The captured list is
+`docs/ai/evidence/rust-test-list.txt`.
 
 | Rust suite | Rust | Java twin | Java |
 |---|---|---|---|

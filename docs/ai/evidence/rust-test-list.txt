@@ -1,0 +1,27 @@
+﻿# Rust test inventory (G2 provenance)
+# Source: copied threat-core at %TEMP%\dac_rust_oracle (unmodified DAC_Tauri code)
+# Captured: 2026-11-18 23:51
+
+csv_parser::tests::blank_lines_and_bom_are_tolerated: test
+csv_parser::tests::header_only_and_empty_files_are_typed_errors: test
+csv_parser::tests::headerless_plain_file_is_sniffed: test
+csv_parser::tests::headerless_typed_file_keeps_its_first_row: test
+csv_parser::tests::plain_dialect_auto_detects_messages: test
+csv_parser::tests::plain_dialect_reads_the_app_sample_format: test
+csv_parser::tests::row_limit_is_a_typed_error_not_truncation: test
+csv_parser::tests::typed_dialect_reads_the_dataset_format: test
+url_rules::tests::http_flagged_https_not: test
+url_rules::tests::ip_host_flagged_and_not_nested: test
+url_rules::tests::long_url_flagged: test
+url_rules::tests::nested_subdomains_on_domains_only: test
+url_rules::tests::nonstandard_port_flagged_default_ports_not: test
+url_rules::tests::punycode_flagged: test
+url_rules::tests::shortener_flagged_exact_and_subdomain_not_lookalike: test
+url_rules::tests::userinfo_at_flagged: test
+test_ten_row_dataset_acceptance: test
+batch_delivers_every_item_and_final_progress: test
+cancel_mid_batch_stops_early_and_closes_cleanly: test
+pre_cancelled_batch_starts_nothing: test
+rapid_cancel_then_fresh_batch_is_independent: test
+test_not_verified_invariants_sweep: test
+test_oversized_input_invariant: test
