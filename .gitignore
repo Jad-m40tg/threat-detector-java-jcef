@@ -9,3 +9,6 @@ target/
 /compat-report.json
 /screenshot-*.png
 /checks.log
+/window-debug.log
+/theme-debug.json
+/perf-report.json
