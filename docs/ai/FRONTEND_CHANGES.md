@@ -65,6 +65,14 @@ moved from the end of `<body>` to `<head>`, immediately before
 `js/core/theme-init.js`, so the patch is active during pre-paint theme
 resolution. No CSS or page logic changed.
 
+## 2026-11-19: performance fix (fix 3)
+
+No front-end product files changed. The applied wins are Java-side: the D3D
+pipeline is requested explicitly in `Launcher`, and `Bridge` coalesces queued
+Java -> JS callbacks into one `executeScript` per FX pulse (order preserved).
+The 40 ms progress throttle in the engine is unchanged, and reduced motion was
+tested but not enabled because it showed no gain.
+
 ## What was not changed
 
 No CSS, no page logic, no service adapter, no HTML structure or data attributes,

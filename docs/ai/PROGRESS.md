@@ -2,7 +2,7 @@
 
 Living project memory for the Java/JavaFX port. Newest entries first.
 
-## Status: complete, G1-G5 pass
+## Status: complete + window/theme/perf fixes, G1-G5 pass
 
 - Source of truth: `C:\Users\ASUS Vivo\Desktop\DAC_Tauri` (read-only).
 - Product UI copied from `DAC_Tauri\src` into `app\src\main\resources\web`.
@@ -73,12 +73,30 @@ Living project memory for the Java/JavaFX port. Newest entries first.
 - Scripts: `run-dev.bat`, `run-checks.bat`, `build-release.bat`,
   `tools\launch.vbs` (optional).
 
+### Phase 5 - window, theme and performance fixes
+
+- Window: stage size now comes from the primary screen visual bounds (90%,
+  capped 1280x800, min 900x600 never larger than the screen). Saved state is
+  validated against all screens; `--reset-window`, `--window-debug`, F11/Escape
+  full screen. Root cause: fixed 1280x800 scene on a 1280x689-logical desktop
+  (150% scaling).
+- Theme: `theme: "system"` now follows the Windows app theme. Java reads
+  `AppsUseLightTheme`, exposes a UA marker plus `get_system_theme`, and the
+  shim owns `matchMedia('(prefers-color-scheme: dark)')`. The last theme write
+  survives exit (600 ms flush grace). Smoke asserts dark and light apply.
+- Perf: added a `--perf` harness driving the real file-drop and batch UI.
+  Coalesced bridge events and set the D3D pipeline explicitly. Streaming
+  improved from ~190 ms to ~76 ms per frame; render/scroll are unchanged and
+  documented with next options in `PERF_REPORT.md`.
+
 ## Verification commands
 
 ```bat
 run-checks.bat        :: mvn clean verify + smoke + compat; ends CHECKS PASSED
 build-release.bat     :: dist\ThreatDetector.jar
 run-dev.bat           :: build and launch with console output
+java -jar app\target\threat-detector-java-1.0.0-all.jar --perf
+java -jar app\target\threat-detector-java-1.0.0-all.jar --theme-debug
 ```
 
 ## Evidence

@@ -46,6 +46,23 @@ public final class Bridge implements AutoCloseable {
     private final BatchRegistry registry = new BatchRegistry();
     private final AtomicBoolean pageReady = new AtomicBoolean(false);
 
+    /* --perf diagnostics: FX-thread time spent inside executeScript. */
+    private volatile long scriptNanos;
+    private volatile long scriptCount;
+    private final java.util.concurrent.ConcurrentLinkedQueue<String> scriptQueue =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final AtomicBoolean flushScheduled = new AtomicBoolean(false);
+
+    /** Number of Java -> JavaScript calls (event delivery) so far. */
+    public long scriptCount() {
+        return scriptCount;
+    }
+
+    /** Total nanoseconds spent inside executeScript on the FX thread. */
+    public long scriptNanos() {
+        return scriptNanos;
+    }
+
     public Bridge(WebEngine engine, Stage stage) {
         this.engine = engine;
         this.stage = stage;
@@ -220,14 +237,54 @@ public final class Bridge implements AutoCloseable {
         runScript("window.__tdShim && window.__tdShim.reject(" + jsString(callId) + "," + jsString(message) + ")");
     }
 
+    /**
+     * Queues a Java -> JavaScript call. Events arrive per item, so one
+     * executeScript per event would pay the FX/WebKit boundary 500 times for a
+     * 500-row batch; instead all scripts queued within one FX pulse are
+     * concatenated into a single call (order preserved, listeners isolate
+     * their own errors). Large queues are capped and continued next pulse.
+     */
     private void runScript(String script) {
-        Platform.runLater(() -> {
+        if (script == null || script.isEmpty()) {
+            return;
+        }
+        scriptQueue.add(script);
+        if (flushScheduled.compareAndSet(false, true)) {
+            Platform.runLater(this::flushScripts);
+        }
+    }
+
+    private static final int MAX_SCRIPT_CHARS = 256 * 1024;
+
+    private void flushScripts() {
+        try {
+            StringBuilder chunk = new StringBuilder();
+            String next;
+            while ((next = scriptQueue.peek()) != null) {
+                if (chunk.length() > 0 && chunk.length() + next.length() > MAX_SCRIPT_CHARS) {
+                    break;
+                }
+                scriptQueue.poll();
+                chunk.append(next).append(";\n");
+            }
+            if (chunk.length() == 0) {
+                return;
+            }
+            long started = System.nanoTime();
             try {
-                engine.executeScript(script);
+                engine.executeScript(chunk.toString());
             } catch (Throwable error) {
                 LOG.log(Level.FINE, "executeScript failed", error);
+            } finally {
+                scriptCount++;
+                scriptNanos += System.nanoTime() - started;
             }
-        });
+        } finally {
+            flushScheduled.set(false);
+            if (!scriptQueue.isEmpty() && flushScheduled.compareAndSet(false, true)) {
+                Platform.runLater(this::flushScripts);
+            }
+        }
     }
 
     private String jsString(String value) {

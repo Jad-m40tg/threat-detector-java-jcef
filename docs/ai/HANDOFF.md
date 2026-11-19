@@ -12,6 +12,8 @@ sources; Rust behavior is the specification.
 ## Where things stand
 
 - G1-G5 pass; see `TEST_MATRIX.md` and `PROGRESS.md`.
+- Window sizing, system theme following and the performance pass are fixed and
+  documented; see `PERF_REPORT.md` and the entries in `LOG.md`.
 - `run-checks.bat` must end with `CHECKS PASSED`.
 - Desktop shortcut `Threat Detector (Java).lnk` targets
   `javaw.exe -jar <repo>\dist\ThreatDetector.jar`; verified to log
@@ -41,7 +43,7 @@ Offline at runtime. First Maven build needs the dependency download.
 | `core/.../engine/` | Semaphore pool, aggregator, cancellation, batch registry |
 | `app/.../WebHost.java` | Asset extraction + loopback HTTP server |
 | `app/.../bridge/Bridge.java` | IPC commands, JSON, events |
-| `app/.../App.java` | WebView window, smoke/compat/screenshot modes |
+| `app/.../App.java` | WebView window, window policy, smoke/compat/theme/perf modes |
 | `app/src/main/resources/web/` | Copied product UI (39 files) |
 | `docs/ai/` | Decisions, contract, test matrix, progress, this file |
 | `docs/ai/evidence/` | Gate logs, reports, screenshots |
@@ -49,11 +51,17 @@ Offline at runtime. First Maven build needs the dependency download.
 ## What to check by eye
 
 1. Double-click the Desktop shortcut: the dashboard opens, no console, no blank
-   page, scan/batch controls visible.
-2. Run the shipped 10-row CSV. Expect 2 Low, 2 Medium, 4 High, 2 NotVerified.
+   page, scan/batch controls visible. The window should fit the screen with a
+   normal title bar and working minimize/maximize/close.
+2. Windows Settings -> Personalization -> Colors: switch app mode dark/light
+   while Settings -> Appearance is on "System"; the app must follow without a
+   restart.
+3. Run the shipped 10-row CSV. Expect 2 Low, 2 Medium, 4 High, 2 NotVerified.
    The two NotVerified rows must show "Not Verified", never Low.
-3. Settings -> Verdict colors -> open a shade: the preview square is a square,
+4. Settings -> Verdict colors -> open a shade: the preview square is a square,
    not a thin strip.
+5. While a 500-row batch streams, the UI should stay responsive (scrolling may
+   still feel heavy; that is the documented remaining cost).
 
 ## Troubleshooting
 
@@ -88,7 +96,7 @@ Offline at runtime. First Maven build needs the dependency download.
 
 ## Deliberate deviations
 
-See `DECISIONS.md` for all 18 entries. The two a reviewer will notice first:
+See `DECISIONS.md` for all 21 entries. The two a reviewer will notice first:
 
 - Batch commands reply `{batchId,total}` before streaming (contract) rather than
   after completion (current Rust code). The page supports both.

@@ -10,8 +10,11 @@ copied here for the handoff.
 | `test-summary.txt` | Surefire XML after the final build | Per-suite and total JUnit counts: 31 tests, 0 failures, 562 golden inputs. |
 | `frontend-audit.txt` | SHA-256 tree comparison | 38 source / 39 copy files; only the shim is added, only four HTML files differ (one script line each). |
 | `rust-test-list.txt` | `cargo test -- --list` in the oracle copy | The 23 Rust tests mapped to same-intent JUnit twins (G2 provenance). |
-| `smoke-test-report.json` | `--smoke-test` | Real adapter path (`backend=tauri`), 10 rows, 2 Low / 2 Medium / 4 High / 2 NotVerified, per-item results. |
+| `smoke-test-report.json` | `--smoke-test` | Real adapter path (`backend=tauri`), 10 rows, 2 Low / 2 Medium / 4 High / 2 NotVerified, window inside visual bounds, dark/light theme assertions, per-item results. |
 | `compat-report.json` | `--compat-audit` | WebKit 617.1 feature matrix, localStorage availability, frame timing. The audit fails if localStorage is unavailable. |
+| `window-debug.log` | `--window-debug --auto-close-ms=4000` | Screen bounds, chosen/saved window geometry, decoration, title and `insideVisualBounds=true`. |
+| `theme-debug.json` | `--theme-debug` | Attributes, `dac_settings`/`td.*` storage, matchMedia support, computed colors for system/dark/light, shim errors. |
+| `perf-report.json` | `--perf` | Idle/theme/batch/scroll frame stats, startup breakdown, bridge script counts and environment. |
 | `screenshot-index.png` | smoke / screenshot mode | Dashboard render in JavaFX WebView. |
 | `screenshot-history.png` | `--screenshot --page=history.html` | History page render. |
 | `screenshot-settings.png` | `--screenshot --page=settings.html` | Settings page render. |

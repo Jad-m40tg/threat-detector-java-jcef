@@ -9,5 +9,6 @@
 | Window geometry | fixed | Screen-aware sizing + saved-state validation; was fixed 1280x800 on a 1280x689 desktop. |
 | Theme: explicit light/dark | fixed | Applies instantly, survives restart (exit flush grace); smoke-asserted. |
 | Theme: "system" | fixed | Registry `AppsUseLightTheme` -> UA marker + `get_system_theme`; shim owns matchMedia(dark). |
-| Perf measurement | pending | `PERF_REPORT.md`; measure idle/theme/scroll/batch frame times. |
+| Perf measurement | done | `PERF_REPORT.md`: idle 18.3 ms, theme 17.4 ms, streaming 75.7 ms/frame (500 rows), scroll 38.8 ms/frame; startup 3.9-5.3 s. |
+| Perf quick wins | done | Explicit D3D pipeline; coalesced Java -> JS events (1068 -> ~36 script calls/run, streaming 190 -> 76 ms). Reduced motion tested, rejected. |
 | Native dark title bar | not planned | Needs JNI/user32; risk outweighs value (see `NEXT_STEPS.md`). |

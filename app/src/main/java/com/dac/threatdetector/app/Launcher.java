@@ -14,6 +14,11 @@ public final class Launcher {
     }
 
     public static void main(String[] args) {
+        // Prefer the hardware (D3D) pipeline; fall back to software only when
+        // D3D is unavailable. Overridable with -Dprism.order=... .
+        if (System.getProperty("prism.order") == null) {
+            System.setProperty("prism.order", "d3d,sw");
+        }
         configureLogging();
         Application.launch(App.class, args);
     }

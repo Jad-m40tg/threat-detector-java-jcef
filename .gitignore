@@ -12,3 +12,11 @@ target/
 /window-debug.log
 /theme-debug.json
 /perf-report.json
+/build.log
+/perf.log
+/smoke.log
+/checks-run.log
+/navtest.log
+/window-run.log
+/theme-run.log
+/checks.log

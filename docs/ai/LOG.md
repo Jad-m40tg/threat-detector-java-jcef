@@ -2,6 +2,11 @@
 
 Newest first. One line per finished unit of work.
 
+- 2026-11-19 fix(perf): measured with `--perf`, then applied two safe quick
+  wins - explicit `prism.order=d3d,sw` and coalesced Java -> JS event delivery
+  (1068 -> ~36 `executeScript` calls per run, streaming 190 -> 76 ms/frame).
+  Reduced motion A/B showed no gain and was not enabled; 40 ms progress
+  throttle unchanged. Regression harness and results in `PERF_REPORT.md`.
 - 2026-11-19 fix(theme): system theme follows Windows (registry -> UA marker +
   `get_system_theme` + shim matchMedia patch); shim tag moved to head; exit()
   flush grace so the last theme choice survives restart; `--theme-debug` dump;

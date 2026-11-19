@@ -133,7 +133,23 @@ The smoke script calls the real front-end adapter path
   result.
 
 Latest run: `SMOKE PASS count=10 levels={Low=2, Medium=2, High=4,
-NotVerified=2} backend=tauri`, ~2.1 s.
+NotVerified=2} backend=tauri windowOk=true themeOk=true`, ~7 s (includes the
+two theme reloads). The report also asserts that the shown window sits inside
+the primary visual bounds, and that dark mode yields `data-theme=dark` with a
+low-luminance body while light yields `data-theme=light` with a bright body.
+
+## Performance harness
+
+```bat
+java -jar app\target\threat-detector-java-1.0.0-all.jar --perf
+```
+
+Drives the page's real file-drop path with the 500-row `stress_500.csv`
+fixture, samples `requestAnimationFrame` deltas, and writes
+`perf-report.json`. Phases: idle, theme switch, 500-row streaming, verdict
+render, 500-row list scroll, plus startup timings and bridge script counts.
+`--perf --perf-reduced` runs the same A/B with reduced motion forced.
+Median results and interpretation: `docs/ai/PERF_REPORT.md`.
 
 ## WebView compatibility audit
 

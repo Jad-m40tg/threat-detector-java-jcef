@@ -136,3 +136,31 @@ under `core/src/test/resources/golden/`.
 The requested delivery is a Desktop shortcut. `build-release.bat` plus
 `tools/create-shortcut.ps1` produce that; `jpackage`/MSI was not required and
 would add a second packaging toolchain.
+
+## D19 - Window geometry is a pure policy object
+
+`WindowState` computes size and position from screen visual bounds and validates
+saved state without touching JavaFX types, so the policy is unit-tested without
+a toolkit. Startup uses 90% of the primary visual bounds, capped at 1280x800 and
+floored at 900x600 (never above the screen); saved state is accepted only when
+fully inside a current screen, otherwise it is ignored. `--reset-window`
+bypasses persistence. This fixed the hard-coded 1280x800 scene on a
+1280x689-logical-pixel desktop.
+
+## D20 - System theme comes from Windows, not WebKit
+
+JavaFX WebKit reports `(prefers-color-scheme: dark)` as light. `WindowsTheme`
+reads `HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize\
+AppsUseLightTheme` with a short cache, passes the value as a UA marker for
+synchronous first paint, and answers `get_system_theme` for live updates. The
+shim owns only that one media query and fires change listeners; all other queries
+pass through. Outside JavaFX the shim is inert.
+
+## D21 - Coalesced bridge event delivery
+
+Item events arrive per row, so one `executeScript` per event paid the Java/WebKit
+boundary cost 500+ times per batch. `Bridge` queues scripts and concatenates
+everything queued within one FX pulse into one call, preserving order and
+capping the chunk at 256 KB. This is a transport change only; the 40 ms progress
+throttle and event payloads are unchanged.
+

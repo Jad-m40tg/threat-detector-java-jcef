@@ -63,6 +63,8 @@ public final class App extends Application {
     private boolean compat;
     private boolean screenshot;
     private boolean themeDebug;
+    private boolean perf;
+    private boolean perfReduced;
     private boolean windowDebug;
     private boolean resetWindow;
     private String pageName = "index.html";
@@ -73,6 +75,10 @@ public final class App extends Application {
     private Object smokeCallback;
     private Object compatCallback;
     private Object themeDebugCallback;
+    private Object perfCallback;
+    private long hostReadyMs;
+    private long engineReadyMs;
+    private long pageReadyMs;
 
     /* ---- window state ---- */
     private Path windowStateFile;
@@ -95,6 +101,8 @@ public final class App extends Application {
         compat = args.contains("--compat-audit");
         screenshot = args.contains("--screenshot");
         themeDebug = args.contains("--theme-debug");
+        perf = args.contains("--perf");
+        perfReduced = args.contains("--perf-reduced");
         windowDebug = args.contains("--window-debug");
         resetWindow = args.contains("--reset-window");
         pageName = parseValue(args, "--page=", "index.html");
@@ -105,6 +113,7 @@ public final class App extends Application {
 
         try {
             host = WebHost.start();
+            hostReadyMs = (System.nanoTime() - START_NANOS) / 1_000_000;
             webView = new WebView();
             engine = webView.getEngine();
             engine.setJavaScriptEnabled(true);
@@ -119,6 +128,7 @@ public final class App extends Application {
             Path userData = Path.of(System.getenv("APPDATA"), "ThreatDetector", "webdata");
             Files.createDirectories(userData);
             engine.setUserDataDirectory(userData.toFile());
+            engineReadyMs = (System.nanoTime() - START_NANOS) / 1_000_000;
 
             bridge = new Bridge(engine, primaryStage);
 
@@ -134,6 +144,8 @@ public final class App extends Application {
 
             applyWindowGeometry(primaryStage, scene);
 
+            engine.locationProperty().addListener((obs, oldUrl, newUrl) ->
+                    LOG.info("NAV " + oldUrl + " -> " + newUrl));
             engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
                 if (newState == Worker.State.SCHEDULED) {
                     bridge.setPageReady(false);
@@ -142,7 +154,7 @@ public final class App extends Application {
                 } else if (newState == Worker.State.FAILED) {
                     Throwable error = engine.getLoadWorker().getException();
                     LOG.log(Level.SEVERE, "Page load failed", error);
-                    if (smoke || compat || themeDebug) {
+                    if (smoke || compat || themeDebug || perf) {
                         writeFailureReport(error == null ? "page load failed" : error.toString());
                         exit(1);
                     }
@@ -162,7 +174,7 @@ public final class App extends Application {
             engine.load(host.baseUrl() + pageName);
         } catch (Throwable error) {
             LOG.log(Level.SEVERE, "Startup failed", error);
-            if (smoke || compat || themeDebug) {
+            if (smoke || compat || themeDebug || perf) {
                 writeFailureReport(error.toString());
                 exit(1);
             } else {
@@ -342,8 +354,11 @@ public final class App extends Application {
             JSObject window = (JSObject) engine.executeScript("window");
             window.setMember("__tdJavaBridge", bridge);
             bridge.setPageReady(true);
-            LOG.info("READY page loaded, bridge attached ("
-                    + (System.nanoTime() - START_NANOS) / 1_000_000 + " ms since start)");
+            if (pageReadyMs == 0) {
+                pageReadyMs = (System.nanoTime() - START_NANOS) / 1_000_000;
+            }
+            LOG.info("READY page loaded at " + engine.getLocation()
+                    + ", bridge attached (" + pageReadyMs + " ms since start)");
 
             if (smoke) {
                 runSmokePhase(window);
@@ -351,6 +366,8 @@ public final class App extends Application {
                 runCompatAudit(window);
             } else if (themeDebug) {
                 runThemeDebug(window);
+            } else if (perf) {
+                runPerf(window);
             } else if (screenshot) {
                 PauseTransition prepare = new PauseTransition(Duration.millis(700));
                 prepare.setOnFinished(e -> runScreenshotHooks());
@@ -370,7 +387,7 @@ public final class App extends Application {
             }
         } catch (Throwable error) {
             LOG.log(Level.SEVERE, "Could not attach bridge", error);
-            if (smoke || compat || themeDebug) {
+            if (smoke || compat || themeDebug || perf) {
                 writeFailureReport(error.toString());
                 exit(1);
             }
@@ -585,7 +602,10 @@ public final class App extends Application {
                         try {
                           for (var i = 0; i < localStorage.length; i++) {
                             var k = localStorage.key(i);
-                            keys[k] = localStorage.getItem(k);
+                            /* Only the theme-relevant keys; history can be megabytes. */
+                            if (k !== 'dac_settings' && k.indexOf('td.') !== 0) continue;
+                            var v = localStorage.getItem(k) || '';
+                            keys[k] = v.length > 4096 ? v.slice(0, 4096) + '...(' + v.length + ' chars)' : v;
                           }
                         } catch (e) { keys.error = String(e); }
                         var supports = {};
@@ -660,6 +680,258 @@ public final class App extends Application {
             }
         }
     }
+
+    /* ================= performance measurement (--perf) ================= */
+
+    private void runPerf(JSObject window) {
+        try {
+            Path stress = extractResource("/testdata/stress_500.csv", "stress_500.csv");
+            // The CSV is served to the page as a File object (the page's own
+            // file-picker path is the only one that renders batch rows), so the
+            // harness needs the content here rather than a filesystem path.
+            String csvJson = mapper.writeValueAsString(
+                    Files.readString(stress, StandardCharsets.UTF_8));
+            PerfCallback callback = new PerfCallback();
+            perfCallback = callback;
+            window.setMember("__tdPerfBridge", callback);
+            // A window behind the terminal is still measured, but bring it up
+            // so GPU compositing and vsync behave like a user's session.
+            stage.toFront();
+            stage.requestFocus();
+            engine.executeScript(PERF_JS.formatted(perfReduced ? "true" : "false", csvJson));
+        } catch (Throwable error) {
+            LOG.log(Level.SEVERE, "Perf run could not start", error);
+            writeFailureReport(error.toString());
+            exit(1);
+        }
+    }
+
+    /** JavaScript calls this with the measured phase statistics. */
+    public final class PerfCallback {
+        public void report(String json) {
+            try {
+                Map<String, Object> report = new LinkedHashMap<>();
+                report.put("timestamp", System.currentTimeMillis());
+                report.put("pageName", pageName);
+                report.put("javaVersion", System.getProperty("java.version"));
+                report.put("javaFxVersion", System.getProperty("javafx.version"));
+                report.put("userAgent", engine.getUserAgent());
+                report.put("prismOrder", System.getProperty("prism.order", "<default>"));
+                report.put("outputScaleX", Screen.getPrimary().getOutputScaleX());
+                report.put("window", windowReport);
+                report.put("hostReadyMs", hostReadyMs);
+                report.put("engineReadyMs", engineReadyMs);
+                report.put("pageReadyMs", pageReadyMs);
+                report.put("bridgeScriptCount", bridge.scriptCount());
+                report.put("bridgeScriptMs", bridge.scriptNanos() / 1_000_000);
+                report.put("stageShowing", stage.isShowing());
+                report.put("stageFocused", stage.isFocused());
+                report.put("stageIconified", stage.isIconified());
+                report.putAll(mapper.readValue(json, Map.class));
+                mapper.writerWithDefaultPrettyPrinter().writeValue(
+                        Path.of(System.getProperty("user.dir"), "perf-report.json").toFile(), report);
+                LOG.info("PERF report written to perf-report.json");
+                exit(0);
+            } catch (Exception error) {
+                LOG.log(Level.SEVERE, "Perf report failed", error);
+                writeFailureReport(error.toString());
+                exit(1);
+            }
+        }
+    }
+
+    private static final String PERF_JS = """
+            (function () {
+              var out = {};
+              var reported = false;
+              function stats(frames) {
+                if (!frames.length) return null;
+                var sorted = frames.slice().sort(function (a, b) { return a - b; });
+                var total = 0, longFrames = 0, max = 0;
+                for (var i = 0; i < frames.length; i++) {
+                  total += frames[i];
+                  if (frames[i] > 32) longFrames++;
+                  if (frames[i] > max) max = frames[i];
+                }
+                return { frames: frames.length,
+                         avgMs: Math.round(total / frames.length * 100) / 100,
+                         p95Ms: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
+                         maxMs: Math.round(max * 100) / 100,
+                         longFramesOver32ms: longFrames };
+              }
+              function sampleFor(ms, cb) {
+                var frames = [], prev = 0, start = 0;
+                function tick(t) {
+                  if (!start) start = t;
+                  if (prev) frames.push(t - prev);
+                  prev = t;
+                  if (t - start < ms) { requestAnimationFrame(tick); return; }
+                  cb(frames);
+                }
+                requestAnimationFrame(tick);
+              }
+              var originalTheme = 'system';
+              try {
+                originalTheme = (DAC.settings && DAC.settings.get)
+                  ? (DAC.settings.get('theme') || 'system') : 'system';
+              } catch (e0) {}
+              /* --perf-reduced: measure the front-end's own reduced-motion path
+                 (A/B comparison; restored before reporting). */
+              var forceReduced = %1$s;
+              var originalReduced = false;
+              try { originalReduced = !!DAC.settings.get('reduceAnimations'); } catch (e6) {}
+              if (forceReduced) {
+                try { DAC.settings.set('reduceAnimations', true); } catch (e7) {}
+              }
+              function report() {
+                if (reported) return;
+                reported = true;
+                /* Never leave the user's appearance changed by a measurement. */
+                try { DAC.settings.set('theme', originalTheme); } catch (e1) {}
+                if (forceReduced) {
+                  try { DAC.settings.set('reduceAnimations', originalReduced); } catch (e8) {}
+                }
+                out.forcedReduced = forceReduced;
+                out.motionAttribute = document.documentElement.getAttribute('data-motion');
+                out.visibility = document.visibilityState;
+                window.__tdPerfBridge.report(JSON.stringify(out));
+              }
+              setTimeout(function () { out.timeout = true; report(); }, 90000);
+
+              /* Phase 1: idle baseline, after a warm-up so page boot work is
+                 not counted as steady-state idle. */
+              setTimeout(function () {
+              sampleFor(2500, function (frames) {
+                out.idle = stats(frames);
+                /* Phase 2: theme switch (the front-end's own animated switch). */
+                var tframes = [], tprev = 0, tcount = 0;
+                function themeTick(t) {
+                  if (tprev) tframes.push(t - tprev);
+                  tprev = t;
+                  if (++tcount < 120) { requestAnimationFrame(themeTick); return; }
+                  out.themeSwitch = stats(tframes);
+                  try { DAC.settings.set('theme', originalTheme); } catch (e2) {}
+                  setTimeout(startBatch, 500);
+                }
+                try {
+                  var current = document.documentElement.getAttribute('data-theme');
+                  DAC.settings.set('theme', current === 'dark' ? 'light' : 'dark');
+                } catch (e) { out.themeSwitchError = String(e); }
+                requestAnimationFrame(themeTick);
+              });
+              }, 1500);
+
+              /* Phase 3: 500-row batch through the page's own file-selection
+                 path, so the real batch UI (progress, tally, row list) is
+                 active exactly as it is for a user. The page's fastest preset
+                 (15 ms/item) is kept: the number reflects what a user sees. */
+              function startBatch() {
+                out.startDiagnostics = {
+                  href: String(location.href),
+                  title: document.title,
+                  readyState: document.readyState,
+                  hasDropZone: !!document.getElementById('csv-drop'),
+                  hasBatchList: !!document.getElementById('batch-list'),
+                  javaBridge: typeof window.__tdJavaBridge,
+                  shim: typeof window.__tdShim,
+                  scripts: document.scripts.length,
+                  bodyChildren: document.body ? document.body.children.length : -1
+                };
+                var frames = [], prev = 0, running = true;
+                function batchTick(t) {
+                  if (prev) frames.push(t - prev);
+                  prev = t;
+                  if (running) requestAnimationFrame(batchTick);
+                }
+                requestAnimationFrame(batchTick);
+                var progressEvents = 0, itemEvents = 0;
+                var beginAt = performance.now();
+                TD.events.on('analysis:progress', function () { progressEvents++; });
+                TD.events.on('analysis:item-done', function () { itemEvents++; });
+                TD.events.on('analysis:batch-done', function () {
+                  /* Split the sample: streaming frames vs the chunked row
+                     render that happens after batch-done. */
+                  var runFrames = frames.slice();
+                  out.batch500Run = stats(runFrames);
+                  out.batch500Run.durationMs = Math.round(performance.now() - beginAt);
+                  out.batch500Run.progressEvents = progressEvents;
+                  out.batch500Run.itemEvents = itemEvents;
+                  var runFrameCount = frames.length;
+                  var begin = performance.now();
+                  function waitRows() {
+                    var rows = document.querySelectorAll('#batch-list > *').length;
+                    if (rows < 500 && performance.now() - begin < 15000) {
+                      setTimeout(waitRows, 50);
+                      return;
+                    }
+                    running = false;
+                    var batchStats = stats(frames);
+                    batchStats.durationMs = Math.round(performance.now() - beginAt);
+                    batchStats.renderWaitMs = Math.round(performance.now() - begin);
+                    batchStats.progressEvents = progressEvents;
+                    batchStats.itemEvents = itemEvents;
+                    batchStats.renderedRows = rows;
+                    out.batch500 = batchStats;
+                    out.batch500Render = stats(frames.slice(runFrameCount));
+                    out.batch500Render.rows = rows;
+                    out.batch500Render.durationMs = batchStats.renderWaitMs;
+                    setTimeout(scrollPhase, 300);
+                  }
+                  waitRows();
+                });
+                try {
+                  /* DataTransfer cannot be constructed in this WebKit, so hand
+                     the page's drop handler a plain Event carrying a stand-in
+                     dataTransfer object: the handler only reads .files[0]. */
+                  var csv = %2$s;
+                  var file = new File([csv], 'stress_500.csv',
+                    { type: 'text/csv', lastModified: Date.now() });
+                  var zone = document.getElementById('csv-drop');
+                  var dropEvent = new Event('drop', { bubbles: true, cancelable: true });
+                  dropEvent.dataTransfer = { files: [file] };
+                  zone.dispatchEvent(dropEvent);
+                  out.fileInjectedVia = 'drop(csv-drop)';
+                } catch (e5) {
+                  running = false;
+                  out.fileInjectError = String(e5);
+                  report();
+                }
+              }
+
+              /* Phase 4: scroll the 500-row verdict list, down then up. */
+              function scrollPhase() {
+                var list = document.getElementById('batch-list');
+                if (!list) { out.scroll500Error = 'batch list not found'; report(); return; }
+                var total = list.scrollHeight - list.clientHeight;
+                if (total <= 0) {
+                  out.scroll500Error = 'list not scrollable (rows=' +
+                    document.querySelectorAll('#batch-list > *').length + ')';
+                  report();
+                  return;
+                }
+                var chunk = Math.max(300, Math.round(total / 40));
+                var positions = [];
+                for (var p = 0; p <= total; p += chunk) positions.push(p);
+                for (var q = positions.length - 2; q > 0; q--) positions.push(positions[q]);
+                var frames = [], prev = 0, step = 0;
+                function scrollTick(t) {
+                  if (prev) frames.push(t - prev);
+                  prev = t;
+                  if (step < positions.length) {
+                    list.scrollTop = positions[step++];
+                    requestAnimationFrame(scrollTick);
+                  } else {
+                    var scrollStats = stats(frames) || {};
+                    scrollStats.scrollRangePx = total;
+                    scrollStats.rows = document.querySelectorAll('#batch-list > *').length;
+                    out.scroll500 = scrollStats;
+                    report();
+                  }
+                }
+                requestAnimationFrame(scrollTick);
+              }
+            })();
+            """;
 
     /* ================= shared helpers ================= */
 
