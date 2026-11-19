@@ -4,11 +4,21 @@
    effect is that idle CSS animations pause while the window is not visible or
    not focused (they run exactly as before whenever the user is looking). */
 
-/* Layout/paint/style containment for repeated batch rows. Added by JS once a
-   row's entrance animation has finished so the 10 px rise is never clipped. */
+/* Layout/paint/style containment for repeated batch rows. */
 html.is-javafx .batch-row.is-contained {
   contain: layout paint style;
   contain-intrinsic-size: auto 5em;
+}
+
+/* Rows are recycled while scrolling, so the stagger entrance must never replay. */
+html.is-javafx .batch-row { animation: none; opacity: 1; }
+
+/* Step 5: lighter row paint for the JavaFX build (gradient + color-mix border
+   cost ~45% of scroll paint). Solid risk-colored left accent instead. */
+html.is-javafx .batch-row {
+  background-image: none;
+  border-color: var(--border);
+  box-shadow: inset 3px 0 0 var(--risk-color, var(--na));
 }
 
 /* Same containment for the recent-results table rows (five rows, repainted

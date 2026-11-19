@@ -2338,6 +2338,7 @@ function addDeferred(result) {
      Edge case: score 0 renders a full track (arc hidden) instead of an empty box.
      ============================================================ */
   var RING_R = 52; /* viewBox 0 0 120 120 */
+  var RING_C = 2 * Math.PI * RING_R; /* real circumference; WebKit ignores pathLength on <circle> */
 
   function riskColor(risk) {
     var name = String(risk || '').toLowerCase();
@@ -2347,7 +2348,7 @@ function addDeferred(result) {
     return 'var(--na)'; /* unverified | error | missing */
   }
 
-  function scoreRing(container, score, risk) {
+  function scoreRing(container, score, risk, opts) {
     var host = resolveHost(container);
     var handle = { destroy: noop };
 
@@ -2382,9 +2383,8 @@ function addDeferred(result) {
     var arc = svgEl('circle', {
       'class': 'ring-arc',
       cx: '60', cy: '60', r: String(RING_R),
-      pathLength: '1',
-      'stroke-dasharray': '1',
-      'stroke-dashoffset': '1',
+      'stroke-dasharray': RING_C.toFixed(2),
+      'stroke-dashoffset': RING_C.toFixed(2),
       'stroke-linecap': 'round',
       transform: 'rotate(-90 60 60)',
       style: 'stroke: ' + color
@@ -2402,11 +2402,11 @@ function addDeferred(result) {
     var cancelled = false;
     var raf = 0;
     var bail = 0;
-    var dur = reduceMotion() ? 0 : tokenMs('--dur-draw', 1000);
+    var dur = (reduceMotion() || (opts && opts.animate === false)) ? 0 : tokenMs('--dur-draw', 1000);
     var end = s / 100; /* final arc fraction — the ring shows the score, not 100% */
 
     function paint(progress) {
-      arc.setAttribute('stroke-dashoffset', String(1 - progress * end));
+      arc.setAttribute('stroke-dashoffset', (RING_C * (1 - progress * end)).toFixed(2));
       num.textContent = Math.round(progress * s) + '%';
     }
 
@@ -2467,6 +2467,7 @@ function addDeferred(result) {
      state, no pop.
      ============================================================ */
   var SAFE_R = 34; /* viewBox 0 0 96 96 */
+  var SAFE_C = 2 * Math.PI * SAFE_R;
   var safeGradCounter = 0;
   var CHECK_D = 'M30.5 47 L42 58.5 L65.5 35.5'; /* centered + raised ~2% of ring diameter */
 
@@ -2502,9 +2503,8 @@ function addDeferred(result) {
     var circle = svgEl('circle', {
       'class': 'safe-circle',
       cx: '48', cy: '48', r: String(SAFE_R),
-      pathLength: '1',
-      'stroke-dasharray': '1',
-      'stroke-dashoffset': '1',
+      'stroke-dasharray': SAFE_C.toFixed(2),
+      'stroke-dashoffset': SAFE_C.toFixed(2),
       transform: 'rotate(-90 48 48)',
       'data-anim-draw': 'circle',
       stroke: 'url(#' + gradId + ')'
@@ -2513,9 +2513,6 @@ function addDeferred(result) {
     var check = svgEl('path', {
       'class': 'safe-check',
       d: CHECK_D,
-      pathLength: '1',
-      'stroke-dasharray': '1',
-      'stroke-dashoffset': '1',
       'data-anim-draw': 'check'
     });
 
@@ -2524,6 +2521,14 @@ function addDeferred(result) {
     svg.appendChild(check);
     wrap.appendChild(svg);
     host.appendChild(wrap);
+
+    /* WebKit ignores pathLength on these elements, so use real lengths. */
+    var checkLen = 0;
+    try { checkLen = check.getTotalLength(); } catch (e) { checkLen = 0; }
+    if (checkLen > 0) {
+      check.setAttribute('stroke-dasharray', checkLen.toFixed(2));
+      check.setAttribute('stroke-dashoffset', checkLen.toFixed(2));
+    }
 
     var cancelled = false;
     var started = false;
@@ -2542,13 +2547,17 @@ function addDeferred(result) {
     function draw(el, duration, settle) {
       var began = 0;
       var done = false;
+      function dashLen(el) {
+        var v = parseFloat(el.getAttribute('stroke-dasharray'));
+        return (isFinite(v) && v > 0) ? v : 1;
+      }
       function complete() {
         if (done || cancelled) return;
         done = true;
         if (bail) { clearTimeout(bail); bail = 0; }
         if (raf) cancelAnimationFrame(raf);
         raf = 0;
-        el.setAttribute('stroke-dashoffset', '0.001');
+        el.setAttribute('stroke-dashoffset', '0');
         settle();
       }
       function tick(now) {
@@ -2556,7 +2565,8 @@ function addDeferred(result) {
         if (!began) began = now;
         var t = (now - began) / duration;
         if (t >= 1) { complete(); return; }
-        el.setAttribute('stroke-dashoffset', String(1 - easeOutCubic(t)));
+        var len = dashLen(el);
+        el.setAttribute('stroke-dashoffset', (len * (1 - easeOutCubic(t))).toFixed(2));
         raf = requestAnimationFrame(tick);
       }
       /* End the draw even if frames stop (background tab, occluded window). */

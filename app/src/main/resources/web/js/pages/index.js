@@ -727,7 +727,7 @@
       batchTallyEl.appendChild(span);
     }
   }
-  var rowRingRecs = new WeakMap(); /* ring host → record, consumed by the IO */
+  /* rowRingRecs removed: batch rings are now static (Step 1), no lazy IO needed. */
   var rowCheckRecs = new WeakMap(); /* row-check host → pending draw-on, consumed by the IO */
 
   function rowNum(r) {
@@ -768,9 +768,6 @@
           var en = entries[i];
           if (!en.isIntersecting) continue;
           rowRingIO.unobserve(en.target);
-          var r = rowRingRecs.get(en.target) || null;
-          rowRingRecs.delete(en.target);
-          if (r && typeof V.scoreRing === 'function') V.scoreRing(en.target, r.score, r.risk);
           if (rowCheckRecs.has(en.target)) { /* low row scrolled in: draw the check on */
             rowCheckRecs.delete(en.target);
             en.target.classList.add('is-drawn');
@@ -779,12 +776,6 @@
       }, { root: batchListEl, rootMargin: '90px 0px' });
     }
     return rowRingIO;
-  }
-  function lazyRing(host, rec) {
-    rowRingRecs.set(host, rec);
-    var io = ensureRowIO();
-    if (io) io.observe(host);
-    else if (typeof V.scoreRing === 'function') V.scoreRing(host, rec.score, rec.risk); /* no IO support: draw now */
   }
   function batchRowDom(rec, i, templateOnly) {
     var risk = rec.risk;
@@ -822,7 +813,7 @@
       var ringHost = document.createElement('span');
       ringHost.className = 'ring-wrap batch-row-ring';
       ind.appendChild(ringHost);
-      if (!templateOnly) lazyRing(ringHost, rec);
+      if (!templateOnly && typeof V.scoreRing === 'function') V.scoreRing(ringHost, rec.score, rec.risk, { animate: false });
     } else if (risk === 'unverified') {
       var unv = document.createElement('span');
       if (typeof V.unverifiedRing === 'function') V.unverifiedRing(unv);
@@ -945,7 +936,7 @@
     var btn = node.querySelector('.batch-row-open');
     if (btn) btn.setAttribute('data-idx', String(i));
     var ringHost = node.querySelector('.batch-row-ring');
-    if (ringHost) lazyRing(ringHost, rec);
+    if (ringHost && typeof V.scoreRing === 'function') V.scoreRing(ringHost, rec.score, rec.risk, { animate: false });
     var check = node.querySelector('.row-check');
     if (check) {
       var io = ensureRowIO();
@@ -976,7 +967,8 @@
       threshold: 60,
       overscan: 4,
       rowHeight: 56,
-      renderRow: virtualRow
+      renderRow: virtualRow,
+      updateRow: function (node, index) { return fillBatchRow(node, batchRenderOrder[index], index, false); }
     });
     return batchVirtual;
   }

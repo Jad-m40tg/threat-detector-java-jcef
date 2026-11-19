@@ -159,7 +159,15 @@
               <div class="result-state state-idle" data-state="idle">
                 <div class="dash-c dash-idle-wrap" style="padding:var(--space-6) 0">
                   <h3>Results will appear here</h3>
-                  <p>Analyze a URL or message, or drop a CSV file, to see fictional demo results.</p>
+                  <p id="idle-hint">Analyze a URL or message, or drop a CSV file, to see results.</p>
+                <script>
+                  (function () {
+                    var p = document.getElementById('idle-hint');
+                    if (!p) return;
+                    var mock = !window.__TAURI__ && !(document.documentElement.classList && document.documentElement.classList.contains('is-javafx'));
+                    if (mock) p.textContent = 'Analyze a URL or message, or drop a CSV file, to see fictional demo results.';
+                  })();
+                </script>
                 </div>
               </div>
 
