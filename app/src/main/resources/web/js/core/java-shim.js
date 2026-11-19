@@ -11,6 +11,11 @@
     return;
   }
 
+  /* [perf] JavaFX-only scoping hook: the java-perf.css layer is only linked on
+     the JavaFX pages and is scoped under this class, so a normal browser never
+     sees it. */
+  try { document.documentElement.classList.add("is-javafx"); } catch (e) { /* keep loading */ }
+
   var seq = 0;
   var pending = Object.create(null);
   var listeners = Object.create(null);
@@ -45,6 +50,29 @@
     demandCounts[name] = count | 0;
     pushSub(name);
   }
+
+  /* [perf] idle motion governor: pause CSS animations only while the page is
+     hidden, the window is minimized, or the window lost focus. Focused, visible
+     windows keep running every animation exactly as before. Class lives on
+     documentElement so java-perf.css (html.is-javafx.td-motion-paused *) picks it
+     up without touching the product stylesheets. */
+  function syncIdleMotion() {
+    var root = document.documentElement;
+    var hidden = document.hidden === true || document.visibilityState === "hidden";
+    var focused = typeof document.hasFocus === "function" ? document.hasFocus() !== false : true;
+    var minimized = typeof window !== "undefined" && window.isMinimized === true;
+    var paused = !!(hidden || minimized || !focused);
+    try {
+      root.classList.toggle("td-motion-paused", paused);
+    } catch (e) { /* classList unavailable: keep the last known state */ }
+  }
+  try {
+    document.addEventListener("visibilitychange", syncIdleMotion, false);
+    window.addEventListener("focus", syncIdleMotion, false);
+    window.addEventListener("blur", syncIdleMotion, false);
+    window.addEventListener("pageshow", syncIdleMotion, false);
+    syncIdleMotion();
+  } catch (e) { /* keep loading without the pause hook */ }
 
   /* ===== console/error diagnostics for the shell's --theme-debug dump ===== */
   window.__tdDiag = {

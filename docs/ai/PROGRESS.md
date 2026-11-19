@@ -85,9 +85,12 @@ Living project memory for the Java/JavaFX port. Newest entries first.
   shim owns `matchMedia('(prefers-color-scheme: dark)')`. The last theme write
   survives exit (600 ms flush grace). Smoke asserts dark and light apply.
 - Perf: added a `--perf` harness driving the real file-drop and batch UI.
-  Coalesced bridge events and set the D3D pipeline explicitly. Streaming
-  improved from ~190 ms to ~76 ms per frame; render/scroll are unchanged and
-  documented with next options in `PERF_REPORT.md`.
+  Coalesced bridge events, added demand-driven event subscriptions and direct
+  `JSObject.call` delivery (Step 1). Implemented `#batch-list` DOM virtualization,
+  recent table 150 ms throttling, row template caching, and CSS containment/motion
+  governor (Step 2). Post-batch render dropped from ~2.5 s to 3 ms; streaming duration
+  restored to 4.3 s; look preservation (rows 0, 1, 250, 499) 100% verified. Full
+  details in `PERF_REPORT.md`.
 
 ## Verification commands
 

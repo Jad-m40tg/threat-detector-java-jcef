@@ -92,8 +92,33 @@ Two minimal JS edits, both inert outside the JavaFX shim:
 
 No CSS, HTML, markup or page logic changed.
 
+## 2026-11-19: batch list virtualization and DOM throttling (perf step 2)
+
+Four front-end additions, active only when running inside the JavaFX host:
+
+- `js/components/virtualList.js`: new component implementing a windowed view for
+  long lists (`threshold: 60`, `overscan: 4`, row-height and gap measurement).
+  Derived padding-top stands in for off-screen rows above the window, and a single
+  filler element stands in for off-screen rows below the window, preserving the full
+  scroll range and scrollbar geometry.
+- `css/java-perf.css`: scoped under `html.is-javafx` (which `java-shim.js` sets at
+  boot). Adds CSS layout/paint/style containment for repeated batch rows and
+  recent table rows, plus an idle motion governor that pauses CSS animations only
+  when the window is unfocused, minimized or hidden. Linked in the HTML pages.
+- `js/pages/index.js`:
+  1. Throttled the recent results table during batch streaming (debounced to at most
+     once per 150 ms via `queueRecent`/`flushRecent` with the latest 5 items, plus a
+     final flush on batch completion). Tally counts stay per-item live.
+  2. Batch row template cloning (`rowTemplate` per risk shape, `fillBatchRow`)
+     instead of repeated element creation.
+  3. Integrated `virtualList` on `#batch-list` for batches exceeding 60 rows,
+     retaining identical row markup, risk labels, input title, subtext, lazy rings,
+     and ARIA attributes (`aria-posinset`, `aria-setsize`).
+- `index.html`: added `<script src="js/components/virtualList.js"></script>` and
+  `<link rel="stylesheet" href="css/java-perf.css">`. Other HTML pages link `java-perf.css`.
+
 ## What was not changed
 
-No CSS, no page logic, no service adapter, no HTML structure or data attributes,
-no asset, and no settings/history behavior. The product UI and its mock backend
-fallback remain intact.
+No service adapter, no backend IPC protocol, no URL analysis or scoring rules,
+and no settings/history behavior. Outside JavaFX (or with `?novirt=1`), all
+standard behavior and DOM fallback paths remain intact.

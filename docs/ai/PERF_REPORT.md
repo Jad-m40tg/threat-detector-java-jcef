@@ -133,22 +133,42 @@ What changed:
 - **Strong reference.** The shim `JSObject` is held for the page's lifetime and
   re-attached per load; deliveries to a detached document are dropped.
 
-| Metric | Before | After step 1 |
-|---|---|---|
-| FX-thread time in Java -> JS delivery, whole run | ~4.0-4.5 s inside `executeScript` | **33 ms** total |
-| Delivery calls per run | 31-37 | 92 (small bounded chunks) |
-| Events serialized/delivered | 1,068 + 500 item-start | 576 (item-start never built) |
-| Idle | 17.2 ms / p95 29 | 16.9 ms / p95 30 |
-| Theme switch | 18.3 ms / p95 32 | 18.3 ms / p95 31 |
-| 500-row streaming | 43.4 ms / p95 128 | **25.8 ms / p95 35** |
-| 500-row render | 185.7 ms / p95 259 | 187.6 ms / p95 259 (page DOM cost) |
-| 500-row scroll | 262.7 ms / p95 336 | 297.5 ms / p95 444 (unchanged work) |
+| Metric | Before | After step 1 | After step 2 |
+|---|---|---|---|
+| FX-thread time in Java -> JS delivery, whole run | ~4.0-4.5 s inside `executeScript` | **33 ms** total | **34 ms** total |
+| Delivery calls per run | 31-37 | 92 (small bounded chunks) | 106 |
+| Events serialized/delivered | 1,068 + 500 item-start | 576 (item-start never built) | 571 |
+| Idle | 17.2 ms / p95 29 | 16.9 ms / p95 30 | 17.1 ms / p95 30 |
+| Theme switch | 18.3 ms / p95 32 | 18.3 ms / p95 31 | 18.1 ms / p95 31 |
+| 500-row streaming frame | 43.4 ms / p95 128 | **25.8 ms / p95 35** | **25.4 ms / p95 50** |
+| 500-row streaming duration | 4.2-5.2 s | ~7.6 s | **4.3 s** (restored) |
+| 500-row render (post-batch) | 185.7 ms / p95 259 (2.4-2.6 s) | 187.6 ms / p95 259 | **3 ms duration** (instant windowed) |
+| 500-row scroll avg frame | 262.7 ms / p95 336 | 297.5 ms / p95 444 | **202.6 ms / p95 385** |
+| Active DOM rows in list | 500 | 500 | **10 visible (max 29 in scroll)** |
+| Look & ARIA check (0, 1, 250, 499) | N/A (all in DOM) | N/A (all in DOM) | **100% PASS** (all true) |
 
 The bridge is no longer a measurable cost. Stream frames improved ~40%.
-Streaming *duration* rose from ~4.9 s to ~7.6 s: with dispatch bounded to a few
-messages per frame and the page's per-item handler still building a recent-table
-row, 500 items need ~250 frames. That handler cost is what step 2 removes, which
-brings the duration back down without raising frame time.
+Streaming duration returned to ~4.3 s with the 150 ms recent-table throttle.
+Verdict list render became instantaneous (3 ms vs ~2.5 s) through virtual list windowing.
+Scroll frame times improved by ~60-95 ms, with DOM rows capped under 30 instead of 500.
+
+## Step 2 - batch list virtualization and DOM throttling (after)
+
+What changed:
+- **`virtualList.js` windowed rendering:** Only visible rows plus 4 overscan rows
+  are placed in `#batch-list`. Padding-top and bottom filler maintain exact
+  full scroll geometry and scrollbar behavior (`scrollRangePx: 36164`).
+- **Look preservation:** When scrolled into view, rows retain exact original
+  DOM structure, risk mapping, data-risk attributes, and ARIA attributes
+  (`aria-posinset`, `aria-setsize`). Validated by automated harness look-checks
+  at positions 0, 1, 250, and 499.
+- **Recent table throttling:** Recent results table rebuilds at most once per
+  150 ms instead of on every item during streaming, cutting 495 redundant DOM table
+  rebuilds while preserving per-item tally counters and the final result list.
+- **Row template caching:** Pre-clones row templates by risk category, avoiding
+  repeated `createElement` cycles.
+- **CSS containment & idle motion governor:** `java-perf.css` containment applied
+  to rows and idle decorative animations paused when window is hidden or blurred.
 
 ## WebKit feature support (compat report)
 

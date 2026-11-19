@@ -429,6 +429,30 @@
     trimTo(5);
   }
 
+  /* [perf] During a batch the recent table used to be rebuilt for every item —
+     500 full rows (5 cells + SVG icons each) for a table that shows five. The
+     tally counters stay live; the table now refreshes at most every 150 ms with
+     the latest five results, plus once at batch end, so the final table is
+     identical. */
+  var recentPending = null, recentTimer = null;
+  var RECENT_FLUSH_MS = 150;
+  function flushRecent() {
+    if (recentTimer) { window.clearTimeout(recentTimer); recentTimer = null; }
+    if (!recentPending) return;
+    var list = recentPending;
+    recentPending = null;
+    while (tableBody.firstChild) tableBody.removeChild(tableBody.firstChild);
+    var from = Math.max(0, list.length - 5);
+    for (var i = list.length - 1; i >= from; i--) tableBody.appendChild(rowDom(list[i]));
+    syncResultsEmpty();
+  }
+  function queueRecent(res) {
+    if (!recentPending) recentPending = [];
+    recentPending.push(res);
+    if (recentPending.length > 5) recentPending.splice(0, recentPending.length - 5);
+    if (!recentTimer) recentTimer = window.setTimeout(flushRecent, RECENT_FLUSH_MS);
+  }
+
   /* ============ THREAT SUMMARY (SPEC 7.5) ============ */
   function countUpEl(el, n) {
     if (typeof V.countUp === 'function') { V.countUp(el, n, { duration: 700 }); return; }
@@ -620,6 +644,8 @@
   function startBatch(name, entries) {
     /* capture ONCE per run — settings flips mid-run must not change this run (CONTRACT §2.1) */
     var tdMult = (window.TDSettings && typeof TDSettings.progressMultiplier === "function") ? TDSettings.progressMultiplier() : 1.4;
+    if (recentTimer) { window.clearTimeout(recentTimer); recentTimer = null; }
+    recentPending = null; /* [perf] a stale flush must not leak into this run */
     batchActive = true;
     batchEntries = entries;
     cancelRequested = false; /* this run has not been asked to cancel */
@@ -639,6 +665,7 @@
   }
   function finishBatch(total) {
     if (DAC.history && typeof DAC.history.flush === 'function') DAC.history.flush();
+    flushRecent(); /* [perf] final recent rows, same as the per-item table today */
     batchActive = false;
     batchEntries = null;
     setBusy(false);
@@ -759,7 +786,7 @@
     if (io) io.observe(host);
     else if (typeof V.scoreRing === 'function') V.scoreRing(host, rec.score, rec.risk); /* no IO support: draw now */
   }
-  function batchRowDom(rec, i) {
+  function batchRowDom(rec, i, templateOnly) {
     var risk = rec.risk;
     var rowRisk = (risk === 'unverified' || risk === 'error') ? 'na' : risk;
     var li = document.createElement('li');
@@ -795,7 +822,7 @@
       var ringHost = document.createElement('span');
       ringHost.className = 'ring-wrap batch-row-ring';
       ind.appendChild(ringHost);
-      lazyRing(ringHost, rec);
+      if (!templateOnly) lazyRing(ringHost, rec);
     } else if (risk === 'unverified') {
       var unv = document.createElement('span');
       if (typeof V.unverifiedRing === 'function') V.unverifiedRing(unv);
@@ -832,9 +859,11 @@
       chk.appendChild(cc);
       chk.appendChild(cp);
       ind.appendChild(chk);
-      var io = ensureRowIO();
-      if (io) { rowCheckRecs.set(ind, ind); io.observe(ind); } /* draw-on when scrolled into view */
-      else ind.classList.add('is-drawn'); /* no IO support: draw immediately */
+      if (!templateOnly) {
+        var io = ensureRowIO();
+        if (io) { rowCheckRecs.set(ind, ind); io.observe(ind); } /* draw-on when scrolled into view */
+        else ind.classList.add('is-drawn'); /* no IO support: draw immediately */
+      }
     }
 
     var btn = document.createElement('button');
@@ -866,12 +895,109 @@
     li.appendChild(btn);
     return li;
   }
+  /* ===== [perf] row templates and virtualization =====
+     A batch row is built once per risk shape and cloned afterwards: cloning a
+     template is much cheaper than ~20 createElement calls per row, and the
+     markup is byte-identical because the template is produced by the same
+     batchRowDom used before. Only dynamic text, data attributes and the lazy
+     score ring are filled per row. */
+  var rowTemplates = null;
+  var rowTemplateSamples = {
+    low: { id: '0', input: '', risk: 'low', score: 0, details: '', reasons: [] },
+    medium: { id: '0', input: '', risk: 'medium', score: 50, details: '', reasons: [] },
+    high: { id: '0', input: '', risk: 'high', score: 90, details: '', reasons: [] },
+    unverified: { id: '0', input: '', risk: 'unverified', score: 0, details: '', reasons: [] },
+    na: { id: '0', input: '', risk: 'error', score: 0, details: '', reasons: [] }
+  };
+  function rowTemplate(rowRisk) {
+    if (!rowTemplates) rowTemplates = {};
+    if (!rowTemplates[rowRisk]) {
+      var template = batchRowDom(rowTemplateSamples[rowRisk] || rowTemplateSamples.na, 0, true);
+      template.removeAttribute('style');
+      template.removeAttribute('data-index');
+      rowTemplates[rowRisk] = template;
+    }
+    return rowTemplates[rowRisk];
+  }
+  function fillBatchRow(node, rec, i, animate) {
+    var risk = rec.risk;
+    var rowRisk = (risk === 'unverified' || risk === 'error') ? 'na' : risk;
+    node.setAttribute('data-risk', rowRisk);
+    node.setAttribute('data-index', String(i));
+    /* a windowed list still exposes the true position in the set */
+    node.setAttribute('aria-posinset', String(i + 1));
+    node.setAttribute('aria-setsize', String(batchRenderOrder.length));
+    node.style.setProperty('--row-i', String(i < 20 ? i : 20));
+    var lbl = node.querySelector('.risk-label');
+    if (lbl) {
+      lbl.setAttribute('data-risk', rowRisk);
+      lbl.textContent = RISK_LABEL[risk] || 'Not verified';
+    }
+    var input = node.querySelector('.batch-row-input');
+    if (input) {
+      var shown = rowInputShown(rec);
+      input.textContent = shown;
+      if (shown !== '(empty input)') input.title = String(rec.input);
+      else input.removeAttribute('title');
+    }
+    var sub = node.querySelector('.batch-row-sub');
+    if (sub) sub.textContent = rowSub(rec);
+    var btn = node.querySelector('.batch-row-open');
+    if (btn) btn.setAttribute('data-idx', String(i));
+    var ringHost = node.querySelector('.batch-row-ring');
+    if (ringHost) lazyRing(ringHost, rec);
+    var check = node.querySelector('.row-check');
+    if (check) {
+      var io = ensureRowIO();
+      if (io) { rowCheckRecs.set(check, check); io.observe(check); }
+      else check.classList.add('is-drawn');
+    }
+    if (!animate) {
+      /* recycled row: no staggered entrance (it is already in view) */
+      node.style.animation = 'none';
+      node.style.opacity = '1';
+    }
+    return node;
+  }
+  function virtualRow(index, animate) {
+    var rec = batchRenderOrder[index];
+    var risk = rec && rec.risk;
+    var rowRisk = (risk === 'unverified' || risk === 'error') ? 'na' : risk;
+    var node = rowTemplate(rowRisk).cloneNode(true);
+    return fillBatchRow(node, rec, index, animate);
+  }
+  var batchVirtual = null;
+  var virtDisabled = /[?&]novirt=1\b/.test(String(location.search));
+  function ensureBatchVirtual() {
+    if (batchVirtual || virtDisabled) return batchVirtual;
+    if (!TD.components || typeof TD.components.virtualList !== 'object') return null;
+    batchVirtual = TD.components.virtualList.create({
+      root: batchListEl,
+      threshold: 60,
+      overscan: 4,
+      rowHeight: 56,
+      renderRow: virtualRow
+    });
+    return batchVirtual;
+  }
   function renderBatchRows() {
     if (!batchListEl) return;
-    batchListEl.textContent = '';
-    batchListEl.scrollTop = 0; /* scroll resets per batch */
     var rows = batchRows.slice(0).sort(function (a, b) { return rowNum(a) - rowNum(b); });
     batchRenderOrder = rows;
+    batchListEl.setAttribute('data-row-count', String(rows.length));
+    var virtual = rows.length > 60 ? ensureBatchVirtual() : null;
+    if (virtual) {
+      /* the windowed path owns the DOM and scroll position from here */
+      batchListEl.textContent = '';
+      batchListEl.scrollTop = 0; /* scroll resets per batch */
+      virtual.setItems(rows);
+      syncHeight();
+      return;
+    }
+    if (batchVirtual) batchVirtual.setItems([]); /* stop the previous window */
+    batchListEl.textContent = '';
+    batchListEl.style.removeProperty('padding-top');
+    batchListEl.scrollTop = 0; /* scroll resets per batch */
     var CH = 40, done = 0;
     function chunk() {
       var frag = document.createDocumentFragment();
@@ -974,6 +1100,8 @@
     batchActive = false;
     batchEntries = null;
     batchRows = []; batchRenderOrder = []; /* [T2b] drop the cleared batch's verdict list */
+    if (recentTimer) { window.clearTimeout(recentTimer); recentTimer = null; }
+    recentPending = null;
     if (batchTallyEl) batchTallyEl.textContent = '';
     scannerH = destroyVisual(scannerH);
     setBusy(false);
@@ -1046,7 +1174,13 @@
       var ui = ipcToUi(p.result);
       if (!(ui.risk in counts)) ui.risk = 'unverified'; /* contract-violation guard */
       batchRows.push(ui); /* [T2b] rendered as a verdict row when the batch closes */
-      pushRow(ui, true);
+      /* [perf] history stays per-item (cheap, needed for the counts); the
+         recent table is throttled to one rebuild per 150 ms. */
+      if (DAC.history) {
+        if (typeof DAC.history.addDeferred === 'function') DAC.history.addDeferred(ui);
+        else if (typeof DAC.history.add === 'function') DAC.history.add(ui);
+      }
+      queueRecent(ui);
       counts[ui.risk]++;
     });
     TD.events.on('analysis:batch-done', function (p) {

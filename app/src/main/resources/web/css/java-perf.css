@@ -1,0 +1,27 @@
+/* ===== JavaFX-only performance hints =====
+   Scoped under html.is-javafx, which js/core/java-shim.js adds at boot. Nothing
+   here changes colours, borders, shadows, spacing or text; the only visible
+   effect is that idle CSS animations pause while the window is not visible or
+   not focused (they run exactly as before whenever the user is looking). */
+
+/* Layout/paint/style containment for repeated batch rows. Added by JS once a
+   row's entrance animation has finished so the 10 px rise is never clipped. */
+html.is-javafx .batch-row.is-contained {
+  contain: layout paint style;
+  contain-intrinsic-size: auto 5em;
+}
+
+/* Same containment for the recent-results table rows (five rows, repainted
+   whenever the table updates during a batch). */
+html.is-javafx .dash-results tbody tr {
+  contain: layout style;
+}
+
+/* Idle cost: the dashboard's decorative loops (scan dots, chip pulse, hero
+   wave/glitch) keep the compositor busy at ~55 fps. They are paused only when
+   the page is hidden or the window is unfocused/minimised. */
+html.is-javafx.td-motion-paused *,
+html.is-javafx.td-motion-paused *::before,
+html.is-javafx.td-motion-paused *::after {
+  animation-play-state: paused !important;
+}

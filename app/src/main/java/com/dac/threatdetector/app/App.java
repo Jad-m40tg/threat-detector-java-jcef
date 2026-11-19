@@ -979,6 +979,8 @@ public final class App extends Application {
                   hasBatchList: !!document.getElementById('batch-list'),
                   javaBridge: typeof window.__tdJavaBridge,
                   shim: typeof window.__tdShim,
+                  diagErrors: (window.__tdDiag && window.__tdDiag.errors) ? window.__tdDiag.errors.slice() : null,
+                  virtDisabled: /[?&]novirt=1\b/.test(String(location.search)),
                   scripts: document.scripts.length,
                   bodyChildren: document.body ? document.body.children.length : -1
                 };
@@ -1005,8 +1007,10 @@ public final class App extends Application {
                   var runFrameCount = frames.length;
                   var begin = performance.now();
                   function waitRows() {
-                    var rows = document.querySelectorAll('#batch-list > *').length;
-                    if (rows < 500 && performance.now() - begin < 15000) {
+                    var list = document.getElementById('batch-list');
+                    var logical = list ? parseInt(list.getAttribute('data-row-count') || '0', 10) : 0;
+                    var domRows = document.querySelectorAll('#batch-list .batch-row').length;
+                    if (logical < 500 && performance.now() - begin < 15000) {
                       setTimeout(waitRows, 50);
                       return;
                     }
@@ -1017,11 +1021,15 @@ public final class App extends Application {
                     batchStats.renderWaitMs = Math.round(performance.now() - begin);
                     batchStats.progressEvents = progressEvents;
                     batchStats.itemEvents = itemEvents;
-                    batchStats.renderedRows = rows;
+                    batchStats.renderedRows = logical || domRows;
+                    batchStats.domRows = domRows;
                     out.batch500 = batchStats;
-                    out.batch500Render = stats(frames.slice(runFrameCount));
-                    out.batch500Render.rows = rows;
+                    out.batch500Render = stats(frames);
+                    out.batch500Render.rows = logical || domRows;
+                    out.batch500Render.domRows = domRows;
                     out.batch500Render.durationMs = batchStats.renderWaitMs;
+                    out.batch500Render.domHtml = list ? String(list.innerHTML || '').slice(0, 220) : null;
+                    out.diagErrors = (window.__tdDiag && window.__tdDiag.errors) ? window.__tdDiag.errors.slice() : null;
                     setTimeout(scrollPhase, 300);
                   }
                   waitRows();
@@ -1052,8 +1060,8 @@ public final class App extends Application {
                 if (!list) { out.scroll500Error = 'batch list not found'; report(); return; }
                 var total = list.scrollHeight - list.clientHeight;
                 if (total <= 0) {
-                  out.scroll500Error = 'list not scrollable (rows=' +
-                    document.querySelectorAll('#batch-list > *').length + ')';
+                  out.scroll500Error = 'list not scrollable (dom rows=' +
+                    document.querySelectorAll('#batch-list .batch-row').length + ')';
                   report();
                   return;
                 }
@@ -1072,9 +1080,53 @@ public final class App extends Application {
                     phaseMark('scroll-end');
                     var scrollStats = stats(frames) || {};
                     scrollStats.scrollRangePx = total;
-                    scrollStats.rows = document.querySelectorAll('#batch-list > *').length;
+                    scrollStats.rows = parseInt(list.getAttribute('data-row-count') || '0', 10);
+                    scrollStats.domRows = document.querySelectorAll('#batch-list .batch-row').length;
                     out.scroll500 = scrollStats;
-                    report();
+                    /* [perf] look-preservation: rows that enter a virtualized
+                       window must keep the full row markup shape, risk mapping
+                       and ARIA position (rows 0/1 top, 250 mid, 499 bottom). */
+                    function lookCheck(idx) {
+                      var row = list.querySelector('.batch-row[data-index="' + idx + '"]');
+                      var ok = !!row && row.classList.contains('batch-row')
+                        && !!row.getAttribute('data-risk')
+                        && row.getAttribute('aria-posinset') === String(idx + 1)
+                        && row.getAttribute('aria-setsize') === String(list.getAttribute('data-row-count') || '0');
+                      out.batch500Look = out.batch500Look || {};
+                      out.batch500Look[idx] = ok;
+                    }
+                    function lookRun() {
+                      function stride() {
+                        var first = list.querySelector('.batch-row');
+                        var h = first ? first.getBoundingClientRect().height : 28;
+                        var gap = parseFloat(window.getComputedStyle(list).rowGap) || 8;
+                        return h + gap;
+                      }
+                      function scrollToTop(cb) {
+                        list.scrollTop = 0;
+                        requestAnimationFrame(function () {
+                          requestAnimationFrame(function () { cb(); });
+                        });
+                      }
+                      scrollToTop(function () {
+                        lookCheck(0);
+                        lookCheck(1);
+                        list.scrollTop = stride() * 250;
+                        requestAnimationFrame(function () {
+                          requestAnimationFrame(function () {
+                            lookCheck(250);
+                            list.scrollTop = stride() * 499;
+                            requestAnimationFrame(function () {
+                              requestAnimationFrame(function () {
+                                lookCheck(499);
+                                report();
+                              });
+                            });
+                          });
+                        });
+                      });
+                    }
+                    lookRun();
                   }
                 }
                 requestAnimationFrame(scrollTick);
