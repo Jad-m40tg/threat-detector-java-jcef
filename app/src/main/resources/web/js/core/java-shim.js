@@ -15,6 +15,37 @@
   var pending = Object.create(null);
   var listeners = Object.create(null);
 
+  /* ===== event demand =====
+     Java emits only events that something on this page listens to. Demand is
+     tracked at the TD.events level (that is what pages use) and pushed to Java
+     by name as it changes, so unused events such as analysis:item-start are
+     never serialized or delivered. The adapter's own listen() calls are not
+     demand: they exist for every analysis event on every page. */
+  var demandCounts = Object.create(null);
+  var directSubs = Object.create(null);
+  var subsSent = Object.create(null);
+  var ANALYSIS_PREFIX = "analysis:";
+
+  function computeSub(name) {
+    if (name.indexOf(ANALYSIS_PREFIX) === 0) return (demandCounts[name] || 0) > 0;
+    return (directSubs[name] || 0) > 0;
+  }
+
+  function pushSub(name) {
+    var bridge = window.__tdJavaBridge;
+    if (!bridge || typeof bridge.subscribe !== "function") return; /* __subs at page ready */
+    var on = computeSub(name);
+    if (subsSent[name] === on) return;
+    subsSent[name] = on;
+    try { bridge.subscribe(name, on); } catch (e) { /* page is going away */ }
+  }
+
+  function demand(name, count) {
+    if (!name) return;
+    demandCounts[name] = count | 0;
+    pushSub(name);
+  }
+
   /* ===== console/error diagnostics for the shell's --theme-debug dump ===== */
   window.__tdDiag = {
     errors: [],
@@ -107,28 +138,115 @@
   }
 
   window.__tdShim = {
+    /* Java delivers one JSON array of pre-serialized messages per JSObject.call.
+       It lands here and is dispatched inside requestAnimationFrame with a small
+       per-frame budget, so a burst of 500 results cannot block one frame. */
+    __deliver: function (jsonText) {
+      var messages = parseJson(jsonText);
+      if (!messages || !messages.length) return;
+      for (var i = 0; i < messages.length; i++) deliveryQueue.push(messages[i]);
+      scheduleDrain();
+    },
+    /* Full subscription set, read by Java right after the page loads. */
+    __subs: function () {
+      var names = Object.create(null), out = [];
+      var key;
+      for (key in demandCounts) names[key] = true;
+      for (key in directSubs) names[key] = true;
+      for (key in listeners) names[key] = true;
+      for (key in names) {
+        if (computeSub(key)) out.push(key);
+      }
+      return JSON.stringify(out);
+    },
+    demand: demand,
     resolve: function (callId, payloadJson) {
-      var p = pending[callId];
-      if (!p) return;
-      delete pending[callId];
-      p.resolve(parseJson(payloadJson));
+      resolveCall(callId, parseJson(payloadJson));
     },
     reject: function (callId, message) {
-      var p = pending[callId];
-      if (!p) return;
-      delete pending[callId];
-      p.reject(new Error(String(message === null || message === undefined ? "Java bridge error" : message)));
+      rejectCall(callId, message);
     },
     emit: function (name, payloadJson) {
-      var arr = listeners[name];
-      if (!arr || !arr.length) return;
-      var payload = parseJson(payloadJson);
-      var copy = arr.slice();
-      for (var i = 0; i < copy.length; i++) {
-        try { copy[i]({ event: name, payload: payload }); } catch (e) { /* isolate listener */ }
-      }
+      deliverEvent(name, parseJson(payloadJson));
     }
   };
+
+  /* ===== ordered, time-sliced delivery =====
+     Order is preserved exactly as Java emitted it. Events may not be dropped or
+     reordered; only the Java-side progress coalescing reduces the stream.
+     When batch-done arrives the rest of the queue is drained without a budget
+     so the final table can never be left half-applied. */
+  var deliveryQueue = [];
+  var deliveryHead = 0;
+  var drainScheduled = false;
+  var DRAIN_BUDGET_MS = 6;
+
+  function nowMs() {
+    return (window.performance && performance.now) ? performance.now() : Date.now();
+  }
+
+  function resolveCall(callId, payload) {
+    var p = pending[callId];
+    if (!p) return;
+    delete pending[callId];
+    p.resolve(payload);
+  }
+
+  function rejectCall(callId, message) {
+    var p = pending[callId];
+    if (!p) return;
+    delete pending[callId];
+    p.reject(new Error(String(message === null || message === undefined ? "Java bridge error" : message)));
+  }
+
+  function deliverEvent(name, payload) {
+    var arr = listeners[name];
+    if (!arr || !arr.length) return;
+    var copy = arr.slice();
+    for (var i = 0; i < copy.length; i++) {
+      try { copy[i]({ event: name, payload: payload }); } catch (e) { /* isolate listener */ }
+    }
+  }
+
+  function dispatchMessage(message) {
+    if (!message) return;
+    if (message.r !== undefined) {
+      if (message.e !== undefined) rejectCall(message.r, message.e);
+      else resolveCall(message.r, message.v);
+      return;
+    }
+    if (message.n) deliverEvent(message.n, message.p);
+  }
+
+  function scheduleDrain() {
+    if (drainScheduled) return;
+    drainScheduled = true;
+    requestAnimationFrame(drain);
+  }
+
+  function drain() {
+    drainScheduled = false;
+    var deadline = nowMs() + DRAIN_BUDGET_MS;
+    var urgent = false;
+    var processed = 0;
+    /* Soft budget: one expensive listener must not stretch a 500-item batch to
+       500 frames, so at least two messages are handled per frame. */
+    while (deliveryHead < deliveryQueue.length) {
+      var message = deliveryQueue[deliveryHead++];
+      dispatchMessage(message);
+      processed++;
+      if (message && message.n === "analysis:batch-done") urgent = true;
+      if (!urgent && processed >= 2 && nowMs() >= deadline) break;
+    }
+    if (deliveryHead >= deliveryQueue.length) {
+      deliveryQueue.length = 0;
+      deliveryHead = 0;
+    } else if (deliveryHead > 256) {
+      deliveryQueue.splice(0, deliveryHead);
+      deliveryHead = 0;
+    }
+    if (deliveryHead < deliveryQueue.length) scheduleDrain();
+  }
 
   var tauri = window.__TAURI__ = window.__TAURI__ || {};
   tauri.core = tauri.core || {};
@@ -149,11 +267,17 @@
   tauri.event.listen = function (name, cb) {
     if (typeof cb !== "function") return Promise.resolve(function () {});
     (listeners[name] = listeners[name] || []).push(cb);
+    directSubs[name] = (directSubs[name] || 0) + 1;
+    pushSub(name);
     return Promise.resolve(function () {
       var arr = listeners[name];
       if (!arr) return;
       var i = arr.indexOf(cb);
-      if (i >= 0) arr.splice(i, 1);
+      if (i >= 0) {
+        arr.splice(i, 1);
+        directSubs[name] = Math.max(0, (directSubs[name] || 0) - 1);
+        pushSub(name);
+      }
     });
   };
 

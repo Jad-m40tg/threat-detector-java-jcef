@@ -14,26 +14,34 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.web.WebEngine;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.Duration;
+import netscape.javascript.JSObject;
 
 /**
  * Public bridge object exposed to JavaScript as window.__tdJavaBridge.
  *
  * <p>call() runs on the FX thread (JavaFX invokes Java members there), parses
  * the arguments, and hands all real work to virtual threads. Replies and
- * events go back through Platform.runLater + executeScript in call order.
+ * events go back through a bounded, coalescing outbox that is drained on the
+ * FX thread with one {@link JSObject#call} per chunk.
  */
 public final class Bridge implements AutoCloseable {
 
@@ -46,21 +54,42 @@ public final class Bridge implements AutoCloseable {
     private final BatchRegistry registry = new BatchRegistry();
     private final AtomicBoolean pageReady = new AtomicBoolean(false);
 
-    /* --perf diagnostics: FX-thread time spent inside executeScript. */
+    /* --perf diagnostics: FX-thread time spent inside the JS delivery call. */
     private volatile long scriptNanos;
     private volatile long scriptCount;
-    private final java.util.concurrent.ConcurrentLinkedQueue<String> scriptQueue =
-            new java.util.concurrent.ConcurrentLinkedQueue<>();
-    private final AtomicBoolean flushScheduled = new AtomicBoolean(false);
+    private volatile long droppedProgress;
+    private volatile long deliveredEvents;
 
-    /** Number of Java -> JavaScript calls (event delivery) so far. */
+    /* --delivery-- */
+    private static final int OUTBOX_CAP = 2000;
+    private static final int MAX_CHUNK_EVENTS = 400;
+    private static final double CHUNK_TARGET_MS = 8.0;
+    private final Set<String> subscribed = ConcurrentHashMap.newKeySet();
+    private final Object outboxLock = new Object();
+    private final LinkedHashMap<Object, String> outbox = new LinkedHashMap<>();
+    private final AtomicLong deliverySeq = new AtomicLong();
+    private JSObject shim;
+    private boolean deliveryScheduled;
+    private int chunkEvents = 64;
+
+    /** Number of Java -> JavaScript delivery calls so far. */
     public long scriptCount() {
         return scriptCount;
     }
 
-    /** Total nanoseconds spent inside executeScript on the FX thread. */
+    /** Total nanoseconds spent inside JSObject.call on the FX thread. */
     public long scriptNanos() {
         return scriptNanos;
+    }
+
+    /** Coalesced progress events discarded because the outbox hit its cap. */
+    public long droppedProgress() {
+        return droppedProgress;
+    }
+
+    /** Events actually handed to the page. */
+    public long deliveredEvents() {
+        return deliveredEvents;
     }
 
     public Bridge(WebEngine engine, Stage stage) {
@@ -70,6 +99,75 @@ public final class Bridge implements AutoCloseable {
 
     public void setPageReady(boolean ready) {
         pageReady.set(ready);
+        if (!ready) {
+            detachShim();
+        }
+    }
+
+    /**
+     * Keeps a strong reference to the page's shim object and asks it which
+     * events currently have listeners. Called once per page load, before any
+     * batch can start. Delivery uses this object directly instead of building
+     * and parsing script text on every event.
+     */
+    public void attachShim(JSObject window) {
+        try {
+            Object candidate = window == null ? null : window.getMember("__tdShim");
+            if (!(candidate instanceof JSObject shimObject)) {
+                shim = null;
+                return;
+            }
+            shim = shimObject;
+            Object list = shimObject.call("__subs");
+            if (list != null) {
+                setSubscriptions(String.valueOf(list));
+            }
+        } catch (Throwable error) {
+            LOG.log(Level.WARNING, "Could not attach the JS shim", error);
+            shim = null;
+        }
+    }
+
+    private void detachShim() {
+        JSObject forgotten;
+        synchronized (outboxLock) {
+            forgotten = shim;
+            shim = null;
+            outbox.clear();
+            deliveryScheduled = false;
+        }
+        if (forgotten != null) {
+            LOG.fine("JS shim detached; pending deliveries cleared");
+        }
+    }
+
+    /** Called from the shim whenever an event gains or loses its last listener. */
+    public void subscribe(String name, boolean on) {
+        if (name == null || name.isEmpty()) {
+            return;
+        }
+        if (on) {
+            subscribed.add(name);
+        } else {
+            subscribed.remove(name);
+        }
+    }
+
+    /** Replaces the whole subscription set (JSON array, from __tdShim.__subs). */
+    public void setSubscriptions(String jsonArray) {
+        try {
+            JsonNode names = mapper.readTree(jsonArray == null || jsonArray.isBlank() ? "[]" : jsonArray);
+            subscribed.clear();
+            if (names != null && names.isArray()) {
+                for (JsonNode name : names) {
+                    if (name.isTextual()) {
+                        subscribed.add(name.asText());
+                    }
+                }
+            }
+        } catch (Exception error) {
+            LOG.log(Level.WARNING, "Could not read event subscriptions", error);
+        }
     }
 
     /** Entry point called from js/core/java-shim.js. */
@@ -207,9 +305,15 @@ public final class Bridge implements AutoCloseable {
         });
     }
 
-    /** Emits one analysis:* event to the page. Safe from any thread. */
+    /**
+     * Emits one analysis:* event to the page. Safe from any thread.
+     *
+     * <p>Events with no listener are not serialized and never leave Java. That
+     * matters for `analysis:item-start`, which is emitted per item but has no
+     * consumer in the dashboard.
+     */
     public void emit(String name, Object payload) {
-        if (!pageReady.get()) {
+        if (!pageReady.get() || !subscribed.contains(name)) {
             return;
         }
         String json;
@@ -219,7 +323,24 @@ public final class Bridge implements AutoCloseable {
             LOG.log(Level.WARNING, "Could not serialize event " + name, e);
             return;
         }
-        runScript("window.__tdShim && window.__tdShim.emit(" + jsString(name) + "," + jsString(json) + ")");
+        enqueue("{\"n\":" + jsString(name) + ",\"p\":" + json + "}",
+                coalesceKey(name, payload));
+    }
+
+    /**
+     * Progress is a snapshot of the batch counters, so only the latest value is
+     * useful. Results (item-done, batch-done) are never coalesced or dropped.
+     */
+    private static String coalesceKey(String name, Object payload) {
+        if ("analysis:progress".equals(name)) {
+            return "progress";
+        }
+        if ("analysis:item-start".equals(name)) {
+            String id = payload instanceof BridgeSink.ItemStartEvent start && start.id() != null
+                    ? start.id() : "";
+            return "item-start:" + id;
+        }
+        return null;
     }
 
     private void resolve(String callId, Object payload) {
@@ -230,60 +351,122 @@ public final class Bridge implements AutoCloseable {
             reject(callId, "Could not serialize reply: " + message(e));
             return;
         }
-        runScript("window.__tdShim && window.__tdShim.resolve(" + jsString(callId) + "," + jsString(json) + ")");
+        enqueue("{\"r\":" + jsString(callId) + ",\"v\":" + json + "}", null);
     }
 
     private void reject(String callId, String message) {
-        runScript("window.__tdShim && window.__tdShim.reject(" + jsString(callId) + "," + jsString(message) + ")");
+        enqueue("{\"r\":" + jsString(callId) + ",\"e\":" + jsString(message == null ? "" : message) + "}", null);
     }
 
     /**
-     * Queues a Java -> JavaScript call. Events arrive per item, so one
-     * executeScript per event would pay the FX/WebKit boundary 500 times for a
-     * 500-row batch; instead all scripts queued within one FX pulse are
-     * concatenated into a single call (order preserved, listeners isolate
-     * their own errors). Large queues are capped and continued next pulse.
+     * Adds one pre-serialized message to the outbox and schedules a drain.
+     *
+     * <p>The outbox is bounded. Above the cap only coalescable progress entries
+     * are discarded; replies and results keep queuing even if the page is slow,
+     * because losing one would corrupt the batch. The number dropped is logged.
      */
-    private void runScript(String script) {
-        if (script == null || script.isEmpty()) {
-            return;
+    private void enqueue(String messageJson, String coalesceKey) {
+        boolean schedule;
+        synchronized (outboxLock) {
+            Object key = coalesceKey != null ? coalesceKey : "m" + deliverySeq.incrementAndGet();
+            outbox.put(key, messageJson);
+            if (outbox.size() > OUTBOX_CAP) {
+                int before = outbox.size();
+                outbox.entrySet().removeIf(entry -> entry.getKey() instanceof String keyName
+                        && (keyName.equals("progress") || keyName.startsWith("item-start:")));
+                int removed = before - outbox.size();
+                if (removed > 0) {
+                    droppedProgress += removed;
+                }
+            }
+            schedule = !deliveryScheduled && shim != null;
+            if (schedule) {
+                deliveryScheduled = true;
+            }
         }
-        scriptQueue.add(script);
-        if (flushScheduled.compareAndSet(false, true)) {
-            Platform.runLater(this::flushScripts);
+        if (schedule) {
+            Platform.runLater(this::deliverChunk);
         }
     }
 
-    private static final int MAX_SCRIPT_CHARS = 256 * 1024;
-
-    private void flushScripts() {
-        try {
-            StringBuilder chunk = new StringBuilder();
-            String next;
-            while ((next = scriptQueue.peek()) != null) {
-                if (chunk.length() > 0 && chunk.length() + next.length() > MAX_SCRIPT_CHARS) {
-                    break;
-                }
-                scriptQueue.poll();
-                chunk.append(next).append(";\n");
-            }
-            if (chunk.length() == 0) {
+    /**
+     * Sends at most {@code chunkEvents} messages in one JSObject.call. The next
+     * chunk size follows the measured duration of this call, so a single
+     * FX-thread call stays near {@link #CHUNK_TARGET_MS} ms instead of blocking
+     * a whole pulse with a 500-event payload.
+     */
+    private void deliverChunk() {
+        JSObject target;
+        List<String> batch = new ArrayList<>(Math.min(chunkEvents, 128));
+        synchronized (outboxLock) {
+            if (shim == null || !pageReady.get() || outbox.isEmpty()) {
+                deliveryScheduled = false;
                 return;
             }
-            long started = System.nanoTime();
-            try {
-                engine.executeScript(chunk.toString());
-            } catch (Throwable error) {
-                LOG.log(Level.FINE, "executeScript failed", error);
-            } finally {
-                scriptCount++;
-                scriptNanos += System.nanoTime() - started;
+            target = shim;
+            var iterator = outbox.values().iterator();
+            while (iterator.hasNext() && batch.size() < chunkEvents) {
+                batch.add(iterator.next());
+                iterator.remove();
             }
-        } finally {
-            flushScheduled.set(false);
-            if (!scriptQueue.isEmpty() && flushScheduled.compareAndSet(false, true)) {
-                Platform.runLater(this::flushScripts);
+            deliveryScheduled = false;
+        }
+        if (batch.isEmpty()) {
+            return;
+        }
+        StringBuilder json = new StringBuilder(batch.size() * 96 + 16).append('[');
+        for (int i = 0; i < batch.size(); i++) {
+            if (i > 0) {
+                json.append(',');
             }
+            json.append(batch.get(i));
+        }
+        json.append(']');
+
+        long started = System.nanoTime();
+        boolean ok = true;
+        try {
+            target.call("__deliver", json.toString());
+        } catch (Throwable error) {
+            ok = false;
+            LOG.log(Level.FINE, "JS delivery failed", error);
+        }
+        long elapsed = System.nanoTime() - started;
+        scriptCount++;
+        scriptNanos += elapsed;
+        deliveredEvents += batch.size();
+        adaptChunk(batch.size(), elapsed);
+
+        boolean more;
+        synchronized (outboxLock) {
+            more = !outbox.isEmpty() && shim != null;
+            if (more) {
+                deliveryScheduled = true;
+            }
+        }
+        if (!ok) {
+            // The page went away between attach and delivery; drop what is left
+            // rather than retrying against a dead document.
+            detachShim();
+            return;
+        }
+        if (more) {
+            if (elapsed > 10_000_000L) {
+                PauseTransition pause = new PauseTransition(Duration.millis(16));
+                pause.setOnFinished(event -> deliverChunk());
+                pause.play();
+            } else {
+                Platform.runLater(this::deliverChunk);
+            }
+        }
+    }
+
+    private void adaptChunk(int sent, long nanos) {
+        double ms = nanos / 1_000_000.0;
+        if (ms > CHUNK_TARGET_MS) {
+            chunkEvents = Math.max(8, sent / 2);
+        } else if (ms < 2.0) {
+            chunkEvents = Math.min(MAX_CHUNK_EVENTS, Math.max(16, sent * 2));
         }
     }
 

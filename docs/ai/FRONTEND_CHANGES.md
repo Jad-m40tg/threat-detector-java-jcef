@@ -73,6 +73,25 @@ Java -> JS callbacks into one `executeScript` per FX pulse (order preserved).
 The 40 ms progress throttle in the engine is unchanged, and reduced motion was
 tested but not enabled because it showed no gain.
 
+## 2026-11-19: bridge event subscriptions (perf step 1)
+
+Two minimal JS edits, both inert outside the JavaFX shim:
+
+- `js/core/events.js`: `TD.events.on/off` now report the listener count for the
+  affected event to `window.__tdShim.demand(name, count)`. No change to how
+  events are stored or dispatched; in a browser `__tdShim` is absent and the
+  call is skipped. This is what lets Java skip `analysis:item-start` (no page
+  listener) instead of serializing and delivering 500 unused events per batch.
+- `js/core/java-shim.js`: tracks demand (`analysis:*` events are subscribed only
+  when a page listener exists; other events when a direct `event.listen` exists),
+  exposes `__deliver` (one JSON array per call) with an ordered,
+  `requestAnimationFrame`-sliced queue (soft 6 ms budget, at least two messages
+  per frame, unbounded drain at `analysis:batch-done`) and `__subs` for the
+  initial subscription set. `event.listen`/unlisten update direct subscriptions.
+  The old `resolve`/`reject`/`emit` entry points remain as thin wrappers.
+
+No CSS, HTML, markup or page logic changed.
+
 ## What was not changed
 
 No CSS, no page logic, no service adapter, no HTML structure or data attributes,

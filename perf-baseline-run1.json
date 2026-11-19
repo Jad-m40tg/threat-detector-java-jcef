@@ -1,0 +1,163 @@
+{
+  "timestamp" : 1795102464499,
+  "pageName" : "index.html",
+  "javaVersion" : "22.0.2",
+  "javaFxVersion" : "22.0.2",
+  "userAgent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/617.1 (KHTML, like Gecko) JavaFX/22 Safari/617.1 ThreatDetectorJavaFX TDSystemDark",
+  "prismOrder" : "d3d,sw",
+  "outputScaleX" : 1.5,
+  "window" : {
+    "x" : 136.0,
+    "y" : 53.33333206176758,
+    "width" : 1062.6666259765625,
+    "height" : 600.0,
+    "insideVisualBounds" : true,
+    "visualBounds" : {
+      "width" : 1280.0,
+      "minY" : 0.0,
+      "minX" : 0.0,
+      "height" : 689.0
+    },
+    "outputScaleX" : 1.5,
+    "outputScaleY" : 1.5,
+    "screens" : 1,
+    "fullScreen" : false,
+    "maximized" : false,
+    "resizable" : true,
+    "stageStyle" : "DECORATED",
+    "minWidth" : 900.0,
+    "minHeight" : 600.0,
+    "source" : "saved"
+  },
+  "hostReadyMs" : 467,
+  "engineReadyMs" : 1985,
+  "pageReadyMs" : 3891,
+  "bridgeScriptCount" : 72,
+  "bridgeScriptMs" : 3053,
+  "stageShowing" : true,
+  "stageFocused" : true,
+  "stageIconified" : false,
+  "idle" : {
+    "frames" : 145,
+    "avgMs" : 17.24,
+    "p95Ms" : 29,
+    "maxMs" : 38,
+    "longFramesOver32ms" : 2
+  },
+  "themeSwitch" : {
+    "frames" : 119,
+    "avgMs" : 18.13,
+    "p95Ms" : 32,
+    "maxMs" : 62,
+    "longFramesOver32ms" : 5
+  },
+  "startDiagnostics" : {
+    "href" : "http://127.0.0.1:47821/index.html",
+    "title" : "Threat Detector â€” Dashboard",
+    "readyState" : "complete",
+    "hasDropZone" : true,
+    "hasBatchList" : true,
+    "javaBridge" : "object",
+    "shim" : "object",
+    "scripts" : 13,
+    "bodyChildren" : 12
+  },
+  "fileInjectedVia" : "drop(csv-drop)",
+  "batch500Run" : {
+    "frames" : 133,
+    "avgMs" : 31.17,
+    "p95Ms" : 67,
+    "maxMs" : 109,
+    "longFramesOver32ms" : 65,
+    "durationMs" : 4195,
+    "progressEvents" : 63,
+    "itemEvents" : 500
+  },
+  "batch500" : {
+    "frames" : 147,
+    "avgMs" : 43.31,
+    "p95Ms" : 179,
+    "maxMs" : 268,
+    "longFramesOver32ms" : 79,
+    "durationMs" : 6585,
+    "renderWaitMs" : 2390,
+    "progressEvents" : 63,
+    "itemEvents" : 500,
+    "renderedRows" : 500
+  },
+  "batch500Render" : {
+    "frames" : 14,
+    "avgMs" : 158.64,
+    "p95Ms" : 268,
+    "maxMs" : 268,
+    "longFramesOver32ms" : 14,
+    "rows" : 500,
+    "durationMs" : 2390
+  },
+  "scroll500" : {
+    "frames" : 78,
+    "avgMs" : 233.29,
+    "p95Ms" : 302,
+    "maxMs" : 413,
+    "longFramesOver32ms" : 78,
+    "scrollRangePx" : 36156,
+    "rows" : 500
+  },
+  "forcedReduced" : false,
+  "motionAttribute" : "full",
+  "visibility" : "visible",
+  "navChanged" : false,
+  "pageIsIndex" : true,
+  "navigation" : {
+    "initial" : "http://127.0.0.1:47821/index.html",
+    "final" : "http://127.0.0.1:47821/index.html",
+    "changed" : false,
+    "mismatched" : [ ],
+    "phases" : [ {
+      "phase" : "start",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 1564
+    }, {
+      "phase" : "idle-start",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 3110
+    }, {
+      "phase" : "idle-end",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 5623
+    }, {
+      "phase" : "theme-start",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 5626
+    }, {
+      "phase" : "theme-end",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 7811
+    }, {
+      "phase" : "batch-start",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 8327
+    }, {
+      "phase" : "batch-done",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 12522
+    }, {
+      "phase" : "render-done",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 14911
+    }, {
+      "phase" : "scroll-start",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 15685
+    }, {
+      "phase" : "scroll-end",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 33884
+    }, {
+      "phase" : "report",
+      "href" : "http://127.0.0.1:47821/index.html",
+      "t" : 33891
+    } ]
+  },
+  "inputs" : [ ]
+}

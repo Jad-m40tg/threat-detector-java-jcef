@@ -76,6 +76,11 @@ public final class App extends Application {
     private Object compatCallback;
     private Object themeDebugCallback;
     private Object perfCallback;
+    private boolean perfStarted;
+    private boolean perfReported;
+    private boolean navFailing;
+    private String perfPhase = "none";
+    private String perfInitialUrl;
     private long hostReadyMs;
     private long engineReadyMs;
     private long pageReadyMs;
@@ -144,8 +149,16 @@ public final class App extends Application {
 
             applyWindowGeometry(primaryStage, scene);
 
-            engine.locationProperty().addListener((obs, oldUrl, newUrl) ->
-                    LOG.info("NAV " + oldUrl + " -> " + newUrl));
+            engine.locationProperty().addListener((obs, oldUrl, newUrl) -> {
+                LOG.info("NAV " + oldUrl + " -> " + newUrl);
+                // The perf harness measures one page. A navigation mid-run would
+                // silently swap the measured document (rows, theme, frames), so
+                // it fails the run instead of writing a misleading report.
+                if (perf && perfStarted && !perfReported && perfInitialUrl != null
+                        && newUrl != null && !newUrl.equals(perfInitialUrl)) {
+                    failPerfNavigation(newUrl);
+                }
+            });
             engine.getLoadWorker().stateProperty().addListener((obs, oldState, newState) -> {
                 if (newState == Worker.State.SCHEDULED) {
                     bridge.setPageReady(false);
@@ -353,6 +366,7 @@ public final class App extends Application {
         try {
             JSObject window = (JSObject) engine.executeScript("window");
             window.setMember("__tdJavaBridge", bridge);
+            bridge.attachShim(window);
             bridge.setPageReady(true);
             if (pageReadyMs == 0) {
                 pageReadyMs = (System.nanoTime() - START_NANOS) / 1_000_000;
@@ -367,7 +381,14 @@ public final class App extends Application {
             } else if (themeDebug) {
                 runThemeDebug(window);
             } else if (perf) {
-                runPerf(window);
+                // A page load can report SUCCEEDED more than once. Measuring the
+                // same run twice corrupts both samples (two harnesses race), so
+                // only the first ready page starts the run. Any later page load
+                // is a navigation and is handled as a hard failure below.
+                if (!perfStarted) {
+                    perfStarted = true;
+                    runPerf(window);
+                }
             } else if (screenshot) {
                 PauseTransition prepare = new PauseTransition(Duration.millis(700));
                 prepare.setOnFinished(e -> runScreenshotHooks());
@@ -698,6 +719,7 @@ public final class App extends Application {
             // so GPU compositing and vsync behave like a user's session.
             stage.toFront();
             stage.requestFocus();
+            perfInitialUrl = engine.getLocation();
             engine.executeScript(PERF_JS.formatted(perfReduced ? "true" : "false", csvJson));
         } catch (Throwable error) {
             LOG.log(Level.SEVERE, "Perf run could not start", error);
@@ -706,10 +728,52 @@ public final class App extends Application {
         }
     }
 
+    /**
+     * Fails a perf run whose document changed, after reading the evidence the
+     * old page left in localStorage (phase + recent input events). Without this
+     * the report could describe a page the run did not measure.
+     */
+    private void failPerfNavigation(String newUrl) {
+        if (navFailing) {
+            return;
+        }
+        navFailing = true;
+        perfReported = true;
+        LOG.severe("PERF FAIL page navigated during measurement: " + perfInitialUrl
+                + " -> " + newUrl + " (phase " + perfPhase + ")");
+        PauseTransition settle = new PauseTransition(Duration.millis(500));
+        settle.setOnFinished(event -> {
+            String evidence = "<none>";
+            try {
+                Object raw = engine.executeScript("(function(){try{var v=localStorage"
+                        + ".getItem('__tdPerfLastNav');localStorage.removeItem('__tdPerfLastNav');"
+                        + "return v||'';}catch(e){return '';}})()");
+                if (raw != null && !String.valueOf(raw).isBlank()) {
+                    evidence = String.valueOf(raw);
+                }
+            } catch (Throwable ignored) {
+                // The new document may still be loading; the failure stands.
+            }
+            LOG.severe("PERF NAV EVIDENCE phase=" + perfPhase + " " + evidence);
+            writeFailureReport("perf run navigated: " + perfInitialUrl + " -> " + newUrl
+                    + " (phase " + perfPhase + ", evidence " + evidence + ")");
+            exit(1);
+        });
+        settle.play();
+    }
+
     /** JavaScript calls this with the measured phase statistics. */
     public final class PerfCallback {
+        /** Called at every phase boundary so a failure can name the phase. */
+        public void phase(String name) {
+            perfPhase = name;
+            LOG.info("PERF PHASE " + name + " @ " + engine.getLocation());
+        }
+
         public void report(String json) {
+            perfReported = true;
             try {
+                Map<String, Object> measured = mapper.readValue(json, Map.class);
                 Map<String, Object> report = new LinkedHashMap<>();
                 report.put("timestamp", System.currentTimeMillis());
                 report.put("pageName", pageName);
@@ -724,12 +788,22 @@ public final class App extends Application {
                 report.put("pageReadyMs", pageReadyMs);
                 report.put("bridgeScriptCount", bridge.scriptCount());
                 report.put("bridgeScriptMs", bridge.scriptNanos() / 1_000_000);
+                report.put("bridgeDeliveredEvents", bridge.deliveredEvents());
+                report.put("bridgeDroppedProgress", bridge.droppedProgress());
                 report.put("stageShowing", stage.isShowing());
                 report.put("stageFocused", stage.isFocused());
                 report.put("stageIconified", stage.isIconified());
-                report.putAll(mapper.readValue(json, Map.class));
+                report.putAll(measured);
                 mapper.writerWithDefaultPrettyPrinter().writeValue(
                         Path.of(System.getProperty("user.dir"), "perf-report.json").toFile(), report);
+                boolean navigated = Boolean.TRUE.equals(measured.get("navChanged"));
+                boolean wrongPage = Boolean.FALSE.equals(measured.get("pageIsIndex"));
+                if (navigated || wrongPage) {
+                    LOG.severe("PERF FAIL document changed during measurement (navChanged="
+                            + navigated + ", pageIsIndex=" + measured.get("pageIsIndex") + ")");
+                    exit(1);
+                    return;
+                }
                 LOG.info("PERF report written to perf-report.json");
                 exit(0);
             } catch (Exception error) {
@@ -744,8 +818,59 @@ public final class App extends Application {
             (function () {
               var out = {};
               var reported = false;
-              function stats(frames) {
-                if (!frames.length) return null;
+              /* ---- navigation guard ----
+                 A measurement is only valid for the document it started on. Every
+                 phase boundary records location.href; the run fails if it ever
+                 differs from the first value, so a silent jump to another page
+                 can never be reported as a perf result. */
+              var hrefAtStart = String(location.href);
+              var phaseLog = [];
+              function phaseMark(name) {
+                phaseLog.push({ phase: name, href: String(location.href),
+                                t: Math.round(performance.now()) });
+                try {
+                  var pb = window.__tdPerfBridge;
+                  if (pb && pb.phase) pb.phase(name);
+                } catch (eP) {}
+              }
+              phaseMark('start');
+              /* Diagnostic only: if a navigation happens anyway, the report (or
+                 the Java-side failure) shows which input triggered it. */
+              var inputLog = [];
+              ['pointerdown', 'keydown', 'click', 'focusin'].forEach(function (type) {
+                document.addEventListener(type, function (ev) {
+                  if (inputLog.length >= 40) return;
+                  var t = ev.target;
+                  inputLog.push({
+                    type: type,
+                    t: Math.round(performance.now()),
+                    tag: t && t.tagName ? String(t.tagName).toLowerCase() : String(t),
+                    id: (t && t.id) ? String(t.id) : '',
+                    cls: (t && t.className && typeof t.className === 'string')
+                      ? t.className.slice(0, 40) : '',
+                    key: ev.key ? String(ev.key) : '',
+                    href: (t && t.getAttribute) ? String(t.getAttribute('href') || '') : ''
+                  });
+                }, true);
+              });
+              /* If the document is replaced mid-run, leave the phase and the last
+                 input events in localStorage: the Java guard reads them after the
+                 new page settles and logs them with the failure. */
+              function writeNavEvidence() {
+                try {
+                  localStorage.setItem('__tdPerfLastNav', JSON.stringify({
+                    from: hrefAtStart,
+                    to: String(location.href),
+                    phase: phaseLog.length ? phaseLog[phaseLog.length - 1].phase : 'none',
+                    phases: phaseLog,
+                    inputs: inputLog
+                  }));
+                } catch (eV) {}
+              }
+              window.addEventListener('pagehide', writeNavEvidence);
+              window.addEventListener('unload', writeNavEvidence);
+
+              function stats(frames) {                if (!frames.length) return null;
                 var sorted = frames.slice().sort(function (a, b) { return a - b; });
                 var total = 0, longFrames = 0, max = 0;
                 for (var i = 0; i < frames.length; i++) {
@@ -786,6 +911,7 @@ public final class App extends Application {
               function report() {
                 if (reported) return;
                 reported = true;
+                phaseMark('report');
                 /* Never leave the user's appearance changed by a measurement. */
                 try { DAC.settings.set('theme', originalTheme); } catch (e1) {}
                 if (forceReduced) {
@@ -794,6 +920,20 @@ public final class App extends Application {
                 out.forcedReduced = forceReduced;
                 out.motionAttribute = document.documentElement.getAttribute('data-motion');
                 out.visibility = document.visibilityState;
+                var mismatched = [];
+                for (var pi = 0; pi < phaseLog.length; pi++) {
+                  if (phaseLog[pi].href !== hrefAtStart) mismatched.push(phaseLog[pi]);
+                }
+                out.navChanged = mismatched.length > 0;
+                out.pageIsIndex = String(location.pathname).slice(-11) === '/index.html';
+                out.navigation = {
+                  initial: hrefAtStart,
+                  final: String(location.href),
+                  changed: out.navChanged,
+                  mismatched: mismatched,
+                  phases: phaseLog
+                };
+                out.inputs = inputLog;
                 window.__tdPerfBridge.report(JSON.stringify(out));
               }
               setTimeout(function () { out.timeout = true; report(); }, 90000);
@@ -801,14 +941,18 @@ public final class App extends Application {
               /* Phase 1: idle baseline, after a warm-up so page boot work is
                  not counted as steady-state idle. */
               setTimeout(function () {
+              phaseMark('idle-start');
               sampleFor(2500, function (frames) {
+                phaseMark('idle-end');
                 out.idle = stats(frames);
                 /* Phase 2: theme switch (the front-end's own animated switch). */
+                phaseMark('theme-start');
                 var tframes = [], tprev = 0, tcount = 0;
                 function themeTick(t) {
                   if (tprev) tframes.push(t - tprev);
                   tprev = t;
                   if (++tcount < 120) { requestAnimationFrame(themeTick); return; }
+                  phaseMark('theme-end');
                   out.themeSwitch = stats(tframes);
                   try { DAC.settings.set('theme', originalTheme); } catch (e2) {}
                   setTimeout(startBatch, 500);
@@ -826,6 +970,7 @@ public final class App extends Application {
                  active exactly as it is for a user. The page's fastest preset
                  (15 ms/item) is kept: the number reflects what a user sees. */
               function startBatch() {
+                phaseMark('batch-start');
                 out.startDiagnostics = {
                   href: String(location.href),
                   title: document.title,
@@ -849,6 +994,7 @@ public final class App extends Application {
                 TD.events.on('analysis:progress', function () { progressEvents++; });
                 TD.events.on('analysis:item-done', function () { itemEvents++; });
                 TD.events.on('analysis:batch-done', function () {
+                  phaseMark('batch-done');
                   /* Split the sample: streaming frames vs the chunked row
                      render that happens after batch-done. */
                   var runFrames = frames.slice();
@@ -865,6 +1011,7 @@ public final class App extends Application {
                       return;
                     }
                     running = false;
+                    phaseMark('render-done');
                     var batchStats = stats(frames);
                     batchStats.durationMs = Math.round(performance.now() - beginAt);
                     batchStats.renderWaitMs = Math.round(performance.now() - begin);
@@ -900,6 +1047,7 @@ public final class App extends Application {
 
               /* Phase 4: scroll the 500-row verdict list, down then up. */
               function scrollPhase() {
+                phaseMark('scroll-start');
                 var list = document.getElementById('batch-list');
                 if (!list) { out.scroll500Error = 'batch list not found'; report(); return; }
                 var total = list.scrollHeight - list.clientHeight;
@@ -921,6 +1069,7 @@ public final class App extends Application {
                     list.scrollTop = positions[step++];
                     requestAnimationFrame(scrollTick);
                   } else {
+                    phaseMark('scroll-end');
                     var scrollStats = stats(frames) || {};
                     scrollStats.scrollRangePx = total;
                     scrollStats.rows = document.querySelectorAll('#batch-list > *').length;
