@@ -1,11 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-page="dashboard">
 <head>
   <meta charset="utf-8">
+<script src="js/core/java-shim.js"></script>
 <script src="js/core/theme-init.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Threat Detector demo — fictional heuristic threat checks. No real analysis.">
-  <title>Threat Detector — Dashboard</title>
+  <meta name="description" content="Threat Detector demo â€” fictional heuristic threat checks. No real analysis.">
+  <title>Threat Detector â€” Dashboard</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5 20 5.3v5.2c0 4.8-3.2 8.7-8 10-4.8-1.3-8-5.2-8-10V5.3Z' fill='%238DEB6B'/%3E%3Crect x='9.4' y='10.6' width='5.2' height='4.4' rx='1' fill='none' stroke='%23101418' stroke-width='1.6'/%3E%3Cpath d='M10.6 10.6V9.6a1.4 1.4 0 0 1 2.8 0v1' fill='none' stroke='%23101418' stroke-width='1.6'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/base/motion-tokens.css">
 <link rel="stylesheet" href="css/components/motion-governor.css">
@@ -77,7 +78,7 @@
               <button type="button" class="seg__opt" role="radio" data-value="csv" aria-checked="false" tabindex="-1" aria-controls="panel-csv">CSV Batch</button>
             </div>
 
-            <!-- [T1] scan panels: ONE visible at a time — each block is the shared
+            <!-- [T1] scan panels: ONE visible at a time â€” each block is the shared
                  .reveal component (core.css grid-rows height reveal); index.js
                  toggles data-open + inert/aria-hidden when the segment switches.
                  The collapsed panel contributes zero height, so the old OR
@@ -167,7 +168,7 @@
                   <h3>Scanning <span class="dash-scan-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span></h3>
                   <p class="scan-substatus" id="scan-substatus">Checking URL structure...</p>
                   <div class="scan-progress-zone" id="scan-progress-zone" role="status" aria-live="polite" tabindex="-1">
-                    <span id="scan-progress-label" class="dash-progress-label"><span>Progress</span><span id="scan-progress-count" class="dash-filemeta">Working…</span></span>
+                    <span id="scan-progress-label" class="dash-progress-label"><span>Progress</span><span id="scan-progress-count" class="dash-filemeta">Workingâ€¦</span></span>
                     <div class="progress scan-progress is-indet" id="scan-progress" role="progressbar" aria-labelledby="scan-progress-label" aria-valuemin="0" aria-valuemax="100">
                       <div class="progress-bar" id="scan-progress-bar"></div>
                     </div>
@@ -328,7 +329,7 @@
     </div>
   </main>
 <script src="js/core/core.js"></script>
-<script src="js/core/java-shim.js"></script>
+
 <script src="js/core/td-config.js"></script>
 <script src="js/core/events.js"></script>
 <script src="js/services/bridge.js"></script>

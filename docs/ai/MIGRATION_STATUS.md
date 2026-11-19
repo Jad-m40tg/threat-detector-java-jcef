@@ -7,7 +7,7 @@
 | Front-end copy | done | Byte-identical except shim + 4 script tags (`FRONTEND_CHANGES.md`). |
 | Desktop shortcut | done | `javaw -jar dist\ThreatDetector.jar`; verified launch. |
 | Window geometry | fixed | Screen-aware sizing + saved-state validation; was fixed 1280x800 on a 1280x689 desktop. |
-| Theme: explicit light/dark | verified | Applies instantly, survives reload (smoke-asserted). |
-| Theme: "system" | in progress | WebView always reports light; Java must expose the Windows app theme. |
+| Theme: explicit light/dark | fixed | Applies instantly, survives restart (exit flush grace); smoke-asserted. |
+| Theme: "system" | fixed | Registry `AppsUseLightTheme` -> UA marker + `get_system_theme`; shim owns matchMedia(dark). |
 | Perf measurement | pending | `PERF_REPORT.md`; measure idle/theme/scroll/batch frame times. |
 | Native dark title bar | not planned | Needs JNI/user32; risk outweighs value (see `NEXT_STEPS.md`). |

@@ -2,6 +2,11 @@
 
 Newest first. One line per finished unit of work.
 
+- 2026-11-19 fix(theme): system theme follows Windows (registry -> UA marker +
+  `get_system_theme` + shim matchMedia patch); shim tag moved to head; exit()
+  flush grace so the last theme choice survives restart; `--theme-debug` dump;
+  smoke asserts dark/light apply + persist across reload. Two root causes:
+  WebView always reported light; localStorage journal lost the last write on exit.
 - 2026-11-19 fix(window): screen-aware startup size (90% cap 1280x800), saved-state
   validation with `--reset-window`, `--window-debug`, F11/Escape full screen,
   window geometry + inside-visual-bounds assertion in the smoke report. Root

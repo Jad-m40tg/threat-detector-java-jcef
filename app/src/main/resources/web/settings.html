@@ -1,11 +1,12 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en" data-page="settings">
 <head>
   <meta charset="utf-8">
+<script src="js/core/java-shim.js"></script>
 <script src="js/core/theme-init.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Threat Detector demo — fictional heuristic threat checks. No real analysis.">
-  <title>Threat Detector — Settings</title>
+  <meta name="description" content="Threat Detector demo â€” fictional heuristic threat checks. No real analysis.">
+  <title>Threat Detector â€” Settings</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.5 20 5.3v5.2c0 4.8-3.2 8.7-8 10-4.8-1.3-8-5.2-8-10V5.3Z' fill='%238DEB6B'/%3E%3Crect x='9.4' y='10.6' width='5.2' height='4.4' rx='1' fill='none' stroke='%23101418' stroke-width='1.6'/%3E%3Cpath d='M10.6 10.6V9.6a1.4 1.4 0 0 1 2.8 0v1' fill='none' stroke='%23101418' stroke-width='1.6'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/base/motion-tokens.css">
 <link rel="stylesheet" href="css/components/motion-governor.css">
@@ -118,7 +119,7 @@
         <!-- decorative live preview: a miniature of the real navbar keyed on
              html[data-nav-style] via CSS, never interactive. The five buttons are
              the real navbar links in real order (Dashboard, Settings, Hardware,
-             History, Info — Settings shown as the current page); pages/settings.js
+             History, Info â€” Settings shown as the current page); pages/settings.js
              injects the icons from DAC.glyphs, so they cannot drift from the navbar. -->
         <div class="nav-preview" id="nav-preview" aria-hidden="true">
           <span class="nav-preview__btn"></span>
@@ -147,7 +148,7 @@
       </div>
     </section>
 
-    <!-- ===== Card: Verdict colors (Phase 3 — docs/VERDICT_COLORS.md) =====
+    <!-- ===== Card: Verdict colors (Phase 3 â€” docs/VERDICT_COLORS.md) =====
          Swatch buttons are built by pages/settings.js (aria-label carries the
          effective hex, so it lives in JS). Clicking one opens the shared modal
          shell with the real verdict card + shade picker; nothing is saved
@@ -190,7 +191,7 @@
           <button type="button" class="seg__opt" role="radio" data-value="balanced" aria-checked="true" tabindex="0">Balanced</button>
           <button type="button" class="seg__opt" role="radio" data-value="strict" aria-checked="false" tabindex="-1">Strict</button>
         </div>
-        <p class="set-help">Relaxed +10 · Balanced 0 · Strict −10 on risk thresholds.</p>
+        <p class="set-help">Relaxed +10 Â· Balanced 0 Â· Strict âˆ’10 on risk thresholds.</p>
       </div>
 
       <div class="set-field set-row">
@@ -265,7 +266,7 @@
           <button type="button" class="seg__opt" role="radio" data-value="normal" aria-checked="true" tabindex="0">Normal</button>
           <button type="button" class="seg__opt" role="radio" data-value="slow" aria-checked="false" tabindex="-1">Slow</button>
         </div>
-        <p class="set-help">Fast ≈ 1 s · Normal ≈ 2 s · Slow ≈ 3.5 s</p>
+        <p class="set-help">Fast â‰ˆ 1 s Â· Normal â‰ˆ 2 s Â· Slow â‰ˆ 3.5 s</p>
       </div>
 
       <div class="set-field">
@@ -390,7 +391,7 @@
       <div class="set-card-head">
         <h2 class="card-title" id="hd-about">About</h2>
       </div>
-      <p class="about-line">Threat Detector · Demo v0.1.0</p>
+      <p class="about-line">Threat Detector Â· Demo v0.1.0</p>
       <p class="about-copy">This is a demonstration interface. No real scanning or protection is performed.</p>
       <div class="set-actions">
         <button type="button" class="btn btn-danger" id="btn-reset-all">Reset all settings to defaults</button>
@@ -400,7 +401,7 @@
   </div>
 </main>
 <script src="js/core/core.js"></script>
-<script src="js/core/java-shim.js"></script>
+
 <script src="js/core/td-config.js"></script>
 <script src="js/core/events.js"></script>
 <script src="js/services/bridge.js"></script>

@@ -108,7 +108,13 @@ public final class App extends Application {
             webView = new WebView();
             engine = webView.getEngine();
             engine.setJavaScriptEnabled(true);
-            engine.setUserAgent(engine.getUserAgent() + " ThreatDetectorJavaFX");
+            // The shim reads the marker synchronously, so theme-init.js (the
+            // pre-paint bootstrap) resolves "system" correctly on first paint.
+            // The bridge command get_system_theme keeps it live afterwards.
+            Optional<Boolean> systemDark = WindowsTheme.isDark();
+            engine.setUserAgent(engine.getUserAgent() + " ThreatDetectorJavaFX "
+                    + systemDark.map(dark -> dark ? "TDSystemDark" : "TDSystemLight")
+                            .orElse("TDSystemUnknown"));
 
             Path userData = Path.of(System.getenv("APPDATA"), "ThreatDetector", "webdata");
             Files.createDirectories(userData);
@@ -613,13 +619,17 @@ public final class App extends Application {
                         try { DAC.settings.set('theme', 'light'); } catch (e2) { steps.push({ tag: 'light-error', error: String(e2) }); }
                         setTimeout(function () {
                           steps.push(dump('after-light'));
-                          window.__tdThemeDebugBridge.done(JSON.stringify({
-                            userAgent: navigator.userAgent,
-                            prefersColorSchemeSupported: (function () {
-                              try { return !!window.matchMedia; } catch (e4) { return false; }
-                            })(),
-                            steps: steps
-                          }));
+                          try { DAC.settings.set('theme', 'system'); } catch (e3) { steps.push({ tag: 'system-error', error: String(e3) }); }
+                          setTimeout(function () {
+                            steps.push(dump('after-system'));
+                            window.__tdThemeDebugBridge.done(JSON.stringify({
+                              userAgent: navigator.userAgent,
+                              prefersColorSchemeSupported: (function () {
+                                try { return !!window.matchMedia; } catch (e4) { return false; }
+                              })(),
+                              steps: steps
+                            }));
+                          }, 900);
                         }, 900);
                       }, 900);
                     })();
@@ -761,8 +771,21 @@ public final class App extends Application {
     }
 
     private static void exit(int code) {
+        // Platform.exit starts the toolkit shutdown; WebKit needs a moment to
+        // flush its localStorage journal before the hard System.exit kills the
+        // process. Without this grace period the last settings write (e.g. a
+        // theme change made just before closing) can be lost.
         Platform.exit();
-        System.exit(code);
+        Thread killer = new Thread(() -> {
+            try {
+                Thread.sleep(600);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+            }
+            System.exit(code);
+        }, "dac-exit");
+        killer.setDaemon(true);
+        killer.start();
     }
 
     @Override

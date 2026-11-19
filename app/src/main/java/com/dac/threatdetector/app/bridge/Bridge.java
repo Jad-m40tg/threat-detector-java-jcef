@@ -9,11 +9,15 @@ import com.dac.threatdetector.core.model.InputType;
 import com.dac.threatdetector.core.model.IpcAnalysisResult;
 import com.dac.threatdetector.core.service.CsvParser;
 import com.dac.threatdetector.core.service.CsvParser.CsvRowItem;
+import com.dac.threatdetector.app.WindowsTheme;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -61,6 +65,7 @@ public final class Bridge implements AutoCloseable {
                 case "analyze_csv_content" -> analyzeCsvContent(callId, args);
                 case "cancel_batch" -> cancelBatch(callId, args);
                 case "pick_csv" -> pickCsv(callId);
+                case "get_system_theme" -> systemTheme(callId);
                 default -> reject(callId, "Unknown command: " + command);
             }
         } catch (Throwable error) {
@@ -160,6 +165,25 @@ public final class Bridge implements AutoCloseable {
                         new FileChooser.ExtensionFilter("CSV files", "*.csv"));
                 File file = chooser.showOpenDialog(stage);
                 resolve(callId, file == null ? null : file.getAbsolutePath());
+            } catch (Throwable error) {
+                reject(callId, message(error));
+            }
+        });
+    }
+
+    /**
+     * Windows app-mode theme for the page's matchMedia. Answered off the FX
+     * thread: dark=true/false, or dark=null when unknown (unsupported OS,
+     * registry read failed). The shim keeps its previous value when null.
+     */
+    private void systemTheme(String callId) {
+        workers.submit(() -> {
+            try {
+                Optional<Boolean> dark = WindowsTheme.isDark();
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("dark", dark.orElse(null));
+                payload.put("source", dark.isPresent() ? "registry" : "unavailable");
+                resolve(callId, payload);
             } catch (Throwable error) {
                 reject(callId, message(error));
             }
