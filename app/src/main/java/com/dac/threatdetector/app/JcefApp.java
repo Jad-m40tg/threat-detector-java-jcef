@@ -41,13 +41,21 @@ public final class JcefApp extends Application {
                     CefAppBuilder builder = new CefAppBuilder();
                     builder.setInstallDir(new java.io.File(System.getProperty("user.home"), ".jcef"));
                     try { builder.getCefSettings().user_agent = "Mozilla/5.0 ... ThreatDetectorJCEF TDSystemDark"; } catch (Throwable t) {}
+                    // Writable user-data/cache dirs (avoids HKCU\\Software\\Chromium registry writes).
+                    java.io.File dataDir = new java.io.File(System.getenv("APPDATA"), "ThreatDetector/jcef");
+                    dataDir.mkdirs();
+                    try { builder.getCefSettings().cache_path = dataDir.getAbsolutePath(); } catch (Throwable t) {}
+                    try { builder.getCefSettings().root_cache_path = dataDir.getAbsolutePath(); } catch (Throwable t) {}
                     // Software rendering: this machine has no usable GPU adapter for CEF.
-                    builder.addJcefArgs("--disable-gpu", "--disable-gpu-compositing", "--use-gl=swiftshader", "--disable-features=Vulkan");
+                    builder.addJcefArgs("--disable-gpu", "--disable-gpu-compositing", "--use-gl=swiftshader",
+                            "--disable-features=Vulkan", "--no-sandbox");
                     CefApp app = builder.build();
                     CefClient client = app.createClient();
                     CefBrowser browser = client.createBrowser(url, false, false);
                     // tag the UA so the shim can detect Chromium
-                    SwingUtilities.invokeLater(() -> node.setContent((javax.swing.JComponent) browser.getUIComponent()));
+                    javax.swing.JPanel panel = new javax.swing.JPanel(new java.awt.BorderLayout());
+                    panel.add((java.awt.Component) browser.getUIComponent(), java.awt.BorderLayout.CENTER);
+                    SwingUtilities.invokeLater(() -> node.setContent(panel));
                 } catch (Exception e) {
                     Platform.runLater(() -> {
                         javafx.scene.control.Label l = new javafx.scene.control.Label("JCEF init failed: " + e);
