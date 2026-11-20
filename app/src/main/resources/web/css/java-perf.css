@@ -13,6 +13,13 @@ html.is-javafx .batch-row.is-contained {
 /* Rows are recycled while scrolling, so the stagger entrance must never replay. */
 html.is-javafx .batch-row { animation: none; opacity: 1; }
 
+/* TEMP (user request): remove gradient + color-mix border to test scroll perf. */
+html.is-javafx .batch-row {
+  background-image: none;
+  border-color: var(--border);
+  box-shadow: inset 3px 0 0 var(--risk-color, var(--na));
+}
+
 /* Same containment for the recent-results table rows (five rows, repainted
    whenever the table updates during a batch). */
 html.is-javafx .dash-results tbody tr {
