@@ -110,6 +110,7 @@
 /* Heading/label/row styles for the verdict card moved to
    css/components/verdict-card.css (.verdict-card selectors). */
 .dash-batch-link{margin:var(--space-3) 0 0}
+.dash-batch-inner{overflow:hidden}
 
 /* [T2b] batch rows — scrollable per-row verdict list, one row per CSV entry in
    file order. Each row is its own bordered, risk-tinted block (fix-2 redesign).
