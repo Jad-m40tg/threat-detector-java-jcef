@@ -989,11 +989,65 @@
     });
     return batchVirtual;
   }
+  var pagedMode = /[?&]paged=1\b/.test(String(location.search));
+  var pageSize = 25;
+  var currentPage = 1;
+  var pageControls = null;
+  function ensurePageControls() {
+    if (pageControls || !batchListEl || !batchListEl.parentNode) return;
+    pageControls = document.createElement('div');
+    pageControls.className = 'batch-pager';
+    pageControls.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:var(--space-3);margin:var(--space-2) 0 0';
+    var prev = document.createElement('button');
+    prev.type = 'button'; prev.className = 'btn btn-ghost'; prev.textContent = 'Prev';
+    var info = document.createElement('span');
+    info.className = 'muted'; info.textContent = 'Page 1 of 1';
+    var next = document.createElement('button');
+    next.type = 'button'; next.className = 'btn btn-ghost'; next.textContent = 'Next';
+    pageControls.appendChild(prev);
+    pageControls.appendChild(info);
+    pageControls.appendChild(next);
+    batchListEl.parentNode.insertBefore(pageControls, batchListEl.nextSibling);
+    prev.addEventListener('click', function () { if (currentPage > 1) { currentPage--; renderPage(); } });
+    next.addEventListener('click', function () { var tp = Math.max(1, Math.ceil(batchRenderOrder.length / pageSize)); if (currentPage < tp) { currentPage++; renderPage(); } });
+    pageControls._info = info; pageControls._prev = prev; pageControls._next = next;
+  }
+  function totalPages() { return Math.max(1, Math.ceil(batchRenderOrder.length / pageSize)); }
+  function renderPage() {
+    if (!batchListEl) return;
+    var rows = batchRenderOrder;
+    var tp = totalPages();
+    if (currentPage > tp) currentPage = tp;
+    if (currentPage < 1) currentPage = 1;
+    var start = (currentPage - 1) * pageSize;
+    var end = Math.min(start + pageSize, rows.length);
+    batchListEl.textContent = '';
+    batchListEl.style.removeProperty('padding-top');
+    batchListEl.scrollTop = 0;
+    var frag = document.createDocumentFragment();
+    for (var j = start; j < end; j++) frag.appendChild(batchRowDom(rows[j], j));
+    batchListEl.appendChild(frag);
+    syncHeight();
+    if (pageControls) {
+      pageControls._info.textContent = 'Page ' + currentPage + ' of ' + tp;
+      pageControls._prev.disabled = currentPage <= 1;
+      pageControls._next.disabled = currentPage >= tp;
+      pageControls.hidden = rows.length === 0;
+    }
+  }
   function renderBatchRows() {
     if (!batchListEl) return;
     var rows = batchRows.slice(0).sort(function (a, b) { return rowNum(a) - rowNum(b); });
     batchRenderOrder = rows;
     batchListEl.setAttribute('data-row-count', String(rows.length));
+    if (pagedMode) {
+      currentPage = 1;
+      ensurePageControls();
+      renderPage();
+      syncHeight();
+      return;
+    }
+    if (pageControls) pageControls.hidden = true;
     var virtual = rows.length > 60 ? ensureBatchVirtual() : null;
     if (virtual) {
       /* the windowed path owns the DOM and scroll position from here */

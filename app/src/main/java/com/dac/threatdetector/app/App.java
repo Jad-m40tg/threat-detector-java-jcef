@@ -114,6 +114,7 @@ public final class App extends Application {
         windowDebug = args.contains("--window-debug");
         resetWindow = args.contains("--reset-window");
         pageName = parseValue(args, "--page=", "index.html");
+        if (args.contains("--paged")) pageName = "index.html?paged=1";
         screenshotOut = parseValue(args, "--screenshot-out=", "");
         clickSelector = parseValue(args, "--click=", "");
         scrollSelector = parseValue(args, "--scroll=", "");
@@ -999,6 +1000,7 @@ public final class App extends Application {
                   readyState: document.readyState,
                   hasDropZone: !!document.getElementById('csv-drop'),
                   hasBatchList: !!document.getElementById('batch-list'),
+                  pagedMode: /[?&]paged=1\\b/.test(String(location.search)),
                   javaBridge: typeof window.__tdJavaBridge,
                   shim: typeof window.__tdShim,
                   diagErrors: (window.__tdDiag && window.__tdDiag.errors) ? window.__tdDiag.errors.slice() : null,
