@@ -37,6 +37,12 @@
       <artifactId>javafx-swing</artifactId>
       <version>${javafx.version}</version>
     </dependency>
+    <!-- JCEF (Chromium) — experimental backend, see JcefApp -->
+    <dependency>
+      <groupId>me.friwi</groupId>
+      <artifactId>jcefmaven</artifactId>
+      <version>135.0.20</version>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>

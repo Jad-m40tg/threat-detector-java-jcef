@@ -20,7 +20,11 @@ public final class Launcher {
             System.setProperty("prism.order", "d3d,sw");
         }
         configureLogging();
-        Application.launch(App.class, args);
+        if (java.util.Arrays.asList(args).contains("--jcef")) {
+            Application.launch(JcefApp.class, args);
+        } else {
+            Application.launch(App.class, args);
+        }
     }
 
     /** Mirrors console logging into %APPDATA%/ThreatDetector/app.log for support. */

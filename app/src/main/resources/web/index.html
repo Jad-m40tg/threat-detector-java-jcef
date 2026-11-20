@@ -31,6 +31,19 @@
 
         <!-- ===== SPEC 7.1 HERO ===== -->
         <div class="dash-col">
+          <div id="framework-banner" class="callout dash-callout" data-type="info" role="note" style="margin-bottom:var(--space-3)">
+            <p class="callout__text"><strong>Rendering engine:</strong> <span id="framework-name">…</span></p>
+          </div>
+          <script>
+            (function () {
+              var name = 'JavaFX WebKit';
+              try {
+                if (/Chrome/i.test(navigator.userAgent) && !/JavaFX/i.test(navigator.userAgent)) name = 'Chromium (JCEF)';
+              } catch (e) {}
+              var el = document.getElementById('framework-name');
+              if (el) el.textContent = name;
+            })();
+          </script>
           <section id="hero" class="dash-reveal" aria-labelledby="hero-title">
             <div class="hero-art" aria-hidden="true">
               <svg class="grid-layer" viewBox="0 0 800 300" preserveAspectRatio="xMidYMid slice" focusable="false">
