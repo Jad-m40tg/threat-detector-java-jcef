@@ -21,7 +21,8 @@ public final class Launcher {
         }
         configureLogging();
         if (java.util.Arrays.asList(args).contains("--jcef")) {
-            Application.launch(JcefApp.class, args);
+            // Chromium path is a plain Swing window; do not boot the JavaFX toolkit.
+            JcefApp.start(args);
         } else {
             Application.launch(App.class, args);
         }
