@@ -59,6 +59,7 @@
       scannerH = null, ringT = null, ringU = null, checkH = null,
       shieldH = null,
       batchActive = false, batchEntries = null,
+      latestProgress = null, batchUiTimer = null,
       counts = null, activeMode = 'single', lastRes = null, scanRun = 0,
       /* Batch identity (T2a staleness guards): batchId from the backend's start
          reply filters progress/done events of an OLD batch; cancelRequested lets
@@ -132,6 +133,7 @@
     if (scanTimer) { window.clearTimeout(scanTimer); scanTimer = null; }
     if (subTimer) { window.clearInterval(subTimer); subTimer = null; }
     if (batchTimer) { window.clearTimeout(batchTimer); batchTimer = null; }
+    if (batchUiTimer) { window.clearInterval(batchUiTimer); batchUiTimer = null; }
   }
   function destroyVisual(h) { if (h && typeof h.destroy === 'function') h.destroy(); return null; }
   /* [F] data-risk on the result-panel root (contract §2.2): set per engine risk,
@@ -622,6 +624,11 @@
     cancelRequested = false; /* this run has not been asked to cancel */
     counts = { low: 0, medium: 0, high: 0, unverified: 0, error: 0 };
     batchRows = []; /* [T2b] fresh verdict list per batch */
+    latestProgress = null;
+    if (batchUiTimer) { window.clearInterval(batchUiTimer); batchUiTimer = null; }
+    batchUiTimer = window.setInterval(function () {
+      if (latestProgress) updateBatchUI(latestProgress.done, latestProgress.total);
+    }, 250);
     setBusy(true);
     setPanelRisk(null); /* T2a: no stale verdict tint while the batch runs */
     if (batchTallyEl) batchTallyEl.textContent = '';
@@ -646,6 +653,11 @@
     var tdMult = (window.TDSettings && typeof TDSettings.progressMultiplier === "function") ? TDSettings.progressMultiplier() : 1.4;
     if (recentTimer) { window.clearTimeout(recentTimer); recentTimer = null; }
     recentPending = null; /* [perf] a stale flush must not leak into this run */
+    latestProgress = null;
+    if (batchUiTimer) { window.clearInterval(batchUiTimer); batchUiTimer = null; }
+    batchUiTimer = window.setInterval(function () {
+      if (latestProgress) updateBatchUI(latestProgress.done, latestProgress.total);
+    }, 250);
     batchActive = true;
     batchEntries = entries;
     cancelRequested = false; /* this run has not been asked to cancel */
@@ -664,8 +676,13 @@
     scheduleRow(0, entries.length, tdMult);
   }
   function finishBatch(total) {
+    if (batchUiTimer) { window.clearInterval(batchUiTimer); batchUiTimer = null; }
     if (DAC.history && typeof DAC.history.flush === 'function') DAC.history.flush();
-    flushRecent(); /* [perf] final recent rows, same as the per-item table today */
+    /* recent table: single rebuild from the last 5 results */
+    while (tableBody.firstChild) tableBody.removeChild(tableBody.firstChild);
+    var from = Math.max(0, batchRows.length - 5);
+    for (var i = batchRows.length - 1; i >= from; i--) tableBody.appendChild(rowDom(batchRows[i]));
+    syncResultsEmpty();
     batchActive = false;
     batchEntries = null;
     setBusy(false);
@@ -1089,6 +1106,7 @@
     scanRun++; /* invalidate any in-flight single-scan answer */
     activeBatchId = null; /* events of the cleared batch can no longer match */
     clearTimers();
+    if (batchUiTimer) { window.clearInterval(batchUiTimer); batchUiTimer = null; }
     batchActive = false;
     batchEntries = null;
     batchRows = []; batchRenderOrder = []; /* [T2b] drop the cleared batch's verdict list */
@@ -1155,7 +1173,8 @@
   if (window.TD && TD.events) {
     TD.events.on('analysis:progress', function (p) {
       if (!batchActive || !p || isStaleBatchEvent(p)) return;
-      updateBatchUI(p.done, p.total);
+      /* Stream throttle: store latest; the 4 Hz timer paints it. */
+      latestProgress = p;
     });
     TD.events.on('analysis:item-done', function (p) {
       if (!batchActive || !p || !p.result) return;
@@ -1166,13 +1185,10 @@
       var ui = ipcToUi(p.result);
       if (!(ui.risk in counts)) ui.risk = 'unverified'; /* contract-violation guard */
       batchRows.push(ui); /* [T2b] rendered as a verdict row when the batch closes */
-      /* [perf] history stays per-item (cheap, needed for the counts); the
-         recent table is throttled to one rebuild per 150 ms. */
       if (DAC.history) {
         if (typeof DAC.history.addDeferred === 'function') DAC.history.addDeferred(ui);
         else if (typeof DAC.history.add === 'function') DAC.history.add(ui);
       }
-      queueRecent(ui);
       counts[ui.risk]++;
     });
     TD.events.on('analysis:batch-done', function (p) {

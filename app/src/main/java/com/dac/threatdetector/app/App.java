@@ -65,6 +65,7 @@ public final class App extends Application {
     private boolean themeDebug;
     private boolean perf;
     private boolean perfReduced;
+    private boolean fps;
     private boolean windowDebug;
     private boolean resetWindow;
     private String pageName = "index.html";
@@ -76,6 +77,7 @@ public final class App extends Application {
     private Object compatCallback;
     private Object themeDebugCallback;
     private Object perfCallback;
+    private FxFpsMeter fpsMeter;
     private boolean perfStarted;
     private boolean perfReported;
     private boolean navFailing;
@@ -108,6 +110,7 @@ public final class App extends Application {
         themeDebug = args.contains("--theme-debug");
         perf = args.contains("--perf");
         perfReduced = args.contains("--perf-reduced");
+        fps = args.contains("--fps");
         windowDebug = args.contains("--window-debug");
         resetWindow = args.contains("--reset-window");
         pageName = parseValue(args, "--page=", "index.html");
@@ -138,6 +141,21 @@ public final class App extends Application {
             bridge = new Bridge(engine, primaryStage);
 
             StackPane root = new StackPane(webView);
+            if (fps) {
+                fpsMeter = new FxFpsMeter();
+                javafx.scene.control.Label fpsLabel = new javafx.scene.control.Label("FX -- fps");
+                fpsLabel.setStyle("-fx-text-fill: #8DEB6B; -fx-font-size: 11px; -fx-background-color: rgba(0,0,0,0.55); -fx-padding: 2 6; -fx-background-radius: 4;");
+                javafx.geometry.Insets m = new javafx.geometry.Insets(6, 10, 0, 0);
+                StackPane.setAlignment(fpsLabel, javafx.geometry.Pos.TOP_RIGHT);
+                StackPane.setMargin(fpsLabel, m);
+                root.getChildren().add(fpsLabel);
+                fpsMeter.start();
+                javafx.animation.Timeline tl = new javafx.animation.Timeline(
+                        new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1),
+                                e -> fpsLabel.setText(String.format("FX %.0f fps", fpsMeter.last()))));
+                tl.setCycleCount(javafx.animation.Timeline.INDEFINITE);
+                tl.play();
+            }
             Scene scene = new Scene(root, 1, 1, Color.web(DARK));
             scene.setOnKeyPressed(event -> {
                 if (event.getCode() == KeyCode.F11) {
@@ -764,10 +782,12 @@ public final class App extends Application {
 
     /** JavaScript calls this with the measured phase statistics. */
     public final class PerfCallback {
+        private final java.util.LinkedHashMap<String, Double> fxPhaseFps = new java.util.LinkedHashMap<>();
         /** Called at every phase boundary so a failure can name the phase. */
         public void phase(String name) {
             perfPhase = name;
             LOG.info("PERF PHASE " + name + " @ " + engine.getLocation());
+            if (fpsMeter != null) fxPhaseFps.put(name, fpsMeter.last());
         }
 
         public void report(String json) {
@@ -793,6 +813,8 @@ public final class App extends Application {
                 report.put("stageShowing", stage.isShowing());
                 report.put("stageFocused", stage.isFocused());
                 report.put("stageIconified", stage.isIconified());
+                report.put("fxPhaseFps", fxPhaseFps);
+                report.put("fxFpsSummary", fpsMeter == null ? "n/a" : fpsMeter.summary());
                 report.putAll(measured);
                 mapper.writerWithDefaultPrettyPrinter().writeValue(
                         Path.of(System.getProperty("user.dir"), "perf-report.json").toFile(), report);
@@ -1489,4 +1511,33 @@ public final class App extends Application {
               requestAnimationFrame(tick);
             })();
             """;
+
+    /** JavaFX frame-rate meter (Stage 0 of PERF_LADDER). */
+    public static final class FxFpsMeter extends javafx.animation.AnimationTimer {
+        private long start;
+        private int frames;
+        private volatile double last;
+        private final java.util.ArrayList<Double> s = new java.util.ArrayList<>();
+        @Override public void handle(long now) {
+            if (start == 0) start = now;
+            frames++;
+            long dt = now - start;
+            if (dt >= 1_000_000_000L) {
+                last = frames * 1e9 / dt;
+                synchronized (s) { s.add(last); }
+                frames = 0;
+                start = now;
+            }
+        }
+        public double last() { return last; }
+        public void reset() { synchronized (s) { s.clear(); } }
+        public String summary() {
+            synchronized (s) {
+                if (s.isEmpty()) return "n/a";
+                double sum = 0, min = 1e9;
+                for (double d : s) { sum += d; min = Math.min(min, d); }
+                return String.format("avg %.1f min %.1f fps over %d s", sum / s.size(), min, s.size());
+            }
+        }
+    }
 }
