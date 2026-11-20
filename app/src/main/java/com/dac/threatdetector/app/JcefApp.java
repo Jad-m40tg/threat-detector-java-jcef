@@ -81,6 +81,10 @@ public final class JcefApp {
         installDir.mkdirs();
         dataDir.mkdirs();
         builder.setInstallDir(installDir);
+        if (System.getProperty("td.jcef.dir") != null) {
+            // Packaged installs ship the extracted CEF bundle; never download.
+            builder.setSkipInstallation(true);
+        }
 
         CefSettings settings = builder.getCefSettings();
         String themeMarker = WindowsTheme.isDark()

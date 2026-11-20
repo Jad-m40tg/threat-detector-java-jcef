@@ -39,8 +39,8 @@ Without `--jcef` the same jar runs the JavaFX WebKit backend.
 ```bat
 mvn -q -DskipTests package
 jlink --add-modules ALL-MODULE-PATH --strip-debug --no-header-files --no-man-pages --compress=zip-6 --output ..\runtime-jcef
-jpackage --type app-image --name ThreatDetector-JavaJCEF --dest ..\image --input app\target --main-jar threat-detector-java-1.0.0-all.jar --main-class com.dac.threatdetector.app.Launcher --runtime-image ..\runtime-jcef --icon app\src\main\resources\icons\icon.ico --app-version 1.0.0 --java-options "-Dtd.jcef.dir=$APPDIR\jcef"
-xcopy /e /i /y "%USERPROFILE%\.jcef" "..\image\ThreatDetector-JavaJCEF\jcef"
+jpackage --type app-image --name ThreatDetector-JavaJCEF --dest ..\image --input app\target --main-jar threat-detector-java-1.0.0-all.jar --main-class com.dac.threatdetector.app.JcefLauncher --runtime-image ..\runtime-jcef --icon app\src\main\resources\icons\icon.ico --app-version 1.0.0 --java-options "-Dtd.jcef.dir=$APPDIR\jcef"
+xcopy /e /i /y "%USERPROFILE%\.jcef" "..\image\ThreatDetector-JavaJCEF\app\jcef"
 iscc tools\installer.iss
 ```
 
