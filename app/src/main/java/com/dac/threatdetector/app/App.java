@@ -1,6 +1,7 @@
 package com.dac.threatdetector.app;
 
 import com.dac.threatdetector.app.bridge.Bridge;
+import com.dac.threatdetector.app.bridge.FxBridgeHost;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.awt.image.BufferedImage;
@@ -56,6 +57,7 @@ public final class App extends Application {
     private final ObjectMapper mapper = new ObjectMapper();
     private WebHost host;
     private Bridge bridge;
+    private FxBridgeHost bridgeHost;
     private Stage stage;
     private WebView webView;
     private WebEngine engine;
@@ -139,7 +141,8 @@ public final class App extends Application {
             engine.setUserDataDirectory(userData.toFile());
             engineReadyMs = (System.nanoTime() - START_NANOS) / 1_000_000;
 
-            bridge = new Bridge(engine, primaryStage);
+            bridgeHost = new FxBridgeHost(primaryStage);
+            bridge = new Bridge(bridgeHost);
 
             StackPane root = new StackPane(webView);
             if (fps) {
@@ -385,7 +388,9 @@ public final class App extends Application {
         try {
             JSObject window = (JSObject) engine.executeScript("window");
             window.setMember("__tdJavaBridge", bridge);
-            bridge.attachShim(window);
+            bridgeHost.attach(window);
+            bridge.setSubscriptions(bridgeHost.subscriptions());
+            bridge.attachPage();
             bridge.setPageReady(true);
             if (pageReadyMs == 0) {
                 pageReadyMs = (System.nanoTime() - START_NANOS) / 1_000_000;

@@ -320,7 +320,7 @@
       function clearAll() {
         ui.confirm.open({
           title: 'Clear history',
-          message: 'This removes all scans from the demo history. Demo results are fictional and the demo data can be restored afterwards.',
+          message: 'This removes all scans from your history. This action cannot be undone.',
           confirmLabel: 'Clear history',
           cancelLabel: 'Cancel',
           danger: true

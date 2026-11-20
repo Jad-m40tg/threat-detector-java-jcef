@@ -20,3 +20,11 @@ target/
 /window-run.log
 /theme-run.log
 /checks.log
+
+# Installers, binaries, logs
+*.log
+*.exe
+*.msi
+*.zip
+*.dll
+.qoder/

@@ -31,9 +31,6 @@ a JavaFX `Stage`; JavaFX is not started in `--jcef` mode.
 
 ## Current limitations
 
-- **UI only.** The Java IPC bridge (`window.javaBridge`) is not wired under
-  JCEF yet, so the front-end falls back to its mock backend. Analysis results
-  are placeholders in this mode.
 - **Software rendering.** This machine exposes no usable GPU adapter to CEF,
   so the launcher passes `--disable-gpu`, `--disable-gpu-compositing` and
   `--use-angle=swiftshader`.
@@ -43,6 +40,10 @@ a JavaFX `Stage`; JavaFX is not started in `--jcef` mode.
   benign CEF warning ([java-cef#505](https://github.com/chromiumembedded/java-cef/issues/505));
   it is not the cause of a blank window.
 - No JavaFX FPS overlay in this mode.
+
+> **Bridge status:** The Java IPC bridge (`window.__tdJavaBridge`) is now wired
+> under JCEF via `CefMessageRouter`, so JCEF runs the same core analysis engine
+> as the JavaFX build — results are real, not mock data.
 
 ## Files
 

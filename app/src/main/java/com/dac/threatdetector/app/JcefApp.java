@@ -1,5 +1,8 @@
 package com.dac.threatdetector.app;
 
+import com.dac.threatdetector.app.bridge.Bridge;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.event.WindowAdapter;
@@ -14,6 +17,12 @@ import org.cef.CefApp;
 import org.cef.CefClient;
 import org.cef.CefSettings;
 import org.cef.browser.CefBrowser;
+import org.cef.browser.CefFrame;
+import org.cef.browser.CefMessageRouter;
+import org.cef.callback.CefQueryCallback;
+import org.cef.handler.CefLoadHandlerAdapter;
+import org.cef.handler.CefMessageRouterHandlerAdapter;
+import org.cef.network.CefRequest;
 
 /**
  * Experimental Chromium (JCEF) backend. Loads the same WebHost-served UI but
@@ -24,15 +33,16 @@ import org.cef.browser.CefBrowser;
  * cannot composite heavyweight components, which is what produced the black
  * window in the first attempt.
  *
- * <p>The Java IPC bridge is NOT wired under JCEF yet (no WebEngine/JSObject),
- * so analysis falls back to the front-end mock backend. UI/visuals only.
+ * <p>Analysis uses the same {@link Bridge} and core engine as the JavaFX build.
+ * JavaScript calls arrive through {@code CefMessageRouter} and replies/events
+ * are injected back into {@code window.__tdShim.__deliver}.
  */
 public final class JcefApp {
 
     private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
             + "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36 "
-            + "ThreatDetectorJCEF TDSystemDark";
+            + "ThreatDetectorJCEF";
 
     private JcefApp() {
     }
@@ -63,15 +73,20 @@ public final class JcefApp {
         CefAppBuilder builder = new CefAppBuilder();
 
         // Reuse the CEF bundle already unpacked by the first JCEF run; keep the
-        // browser profile in the app's own writable dir.
-        File installDir = new File(System.getProperty("user.home"), ".jcef");
+        // browser profile in the app's own writable dir. The packaged installer
+        // points td.jcef.dir at the bundle shipped next to the launcher.
+        File installDir = new File(System.getProperty("td.jcef.dir",
+                new File(System.getProperty("user.home"), ".jcef").getPath()));
         File dataDir = new File(System.getenv("LOCALAPPDATA"), "ThreatDetector/jcef/profile");
         installDir.mkdirs();
         dataDir.mkdirs();
         builder.setInstallDir(installDir);
 
         CefSettings settings = builder.getCefSettings();
-        settings.user_agent = USER_AGENT;
+        String themeMarker = WindowsTheme.isDark()
+                .map(dark -> dark ? "TDSystemDark" : "TDSystemLight")
+                .orElse("TDSystemUnknown");
+        settings.user_agent = USER_AGENT + " " + themeMarker;
         settings.cache_path = dataDir.getAbsolutePath();
         settings.root_cache_path = dataDir.getAbsolutePath();
         settings.log_file = new File(dataDir, "cef.log").getAbsolutePath();
@@ -105,23 +120,63 @@ public final class JcefApp {
             WebHost host = WebHost.start();
             String url = host.baseUrl() + "index.html?jcef=1";
 
-            CefClient client = app.createClient();
-            CefBrowser browser = client.createBrowser(url, false, false);
-
-            JPanel content = new JPanel(new BorderLayout());
-            content.add(browser.getUIComponent(), BorderLayout.CENTER);
-
             JFrame frame = new JFrame("Threat Detector (Chromium/JCEF)");
             frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-            frame.setContentPane(content);
             frame.setMinimumSize(new Dimension(900, 600));
             frame.setSize(1152, 700);
             frame.setLocationRelativeTo(null);
+
+            JcefBridgeHost bridgeHost = new JcefBridgeHost(frame);
+            Bridge bridge = new Bridge(bridgeHost);
+            ObjectMapper mapper = new ObjectMapper();
+
+            CefClient client = app.createClient();
+            CefMessageRouter router = CefMessageRouter.create(
+                    new QueryHandler(bridge, mapper));
+            client.addMessageRouter(router);
+            client.addLoadHandler(new CefLoadHandlerAdapter() {
+                @Override
+                public void onLoadStart(CefBrowser browser, CefFrame frame,
+                        CefRequest.TransitionType type) {
+                    if (frame != null && frame.isMain()) {
+                        bridge.setPageReady(false);
+                    }
+                }
+
+                @Override
+                public void onLoadEnd(CefBrowser browser, CefFrame frame, int httpStatusCode) {
+                    if (frame == null || !frame.isMain()) {
+                        return;
+                    }
+                    bridgeHost.attach(browser);
+                    bridge.attachPage();
+                    bridge.setPageReady(true);
+                    // The shim has been live since <head>; tell Java which
+                    // analysis events the page actually listens to.
+                    browser.executeJavaScript(
+                            "(function(){try{var s=window.__tdShim;"
+                            + "if(s&&window.__tdJavaBridge&&window.__tdJavaBridge.sync)"
+                            + "window.__tdJavaBridge.sync(s.__subs());}catch(e){}})()",
+                            browser.getURL(),
+                            0);
+                }
+            });
+
+            CefBrowser browser = client.createBrowser(url, false, false);
+            bridgeHost.attach(browser);
+
+            JPanel content = new JPanel(new BorderLayout());
+            content.add(browser.getUIComponent(), BorderLayout.CENTER);
+            frame.setContentPane(content);
+
             frame.addWindowListener(new WindowAdapter() {
                 @Override
                 public void windowClosing(WindowEvent event) {
+                    bridge.setPageReady(false);
+                    bridgeHost.detach();
                     browser.close(true);
                     frame.dispose();
+                    client.dispose();
                     app.dispose();
                     host.close();
                 }
@@ -134,6 +189,48 @@ public final class JcefApp {
                     "Chromium (JCEF) window failed:\n" + error,
                     "Threat Detector",
                     JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /**
+     * Receives the same call/subscribe/sync envelopes the JavaFX bridge exposes
+     * as JSObject members, and acknowledges them immediately. Actual replies are
+     * delivered asynchronously by {@link Bridge} through the page shim.
+     */
+    private static final class QueryHandler extends CefMessageRouterHandlerAdapter {
+
+        private final Bridge bridge;
+        private final ObjectMapper mapper;
+
+        QueryHandler(Bridge bridge, ObjectMapper mapper) {
+            this.bridge = bridge;
+            this.mapper = mapper;
+        }
+
+        @Override
+        public boolean onQuery(CefBrowser browser, CefFrame frame, long queryId,
+                String request, boolean persistent, CefQueryCallback callback) {
+            try {
+                JsonNode message = mapper.readTree(request == null ? "{}" : request);
+                if (message.hasNonNull("r")) {
+                    bridge.call(
+                            message.path("r").asText(),
+                            message.path("c").asText(),
+                            message.path("a").asText("{}"));
+                } else if (message.hasNonNull("s")) {
+                    bridge.subscribe(
+                            message.path("s").asText(),
+                            message.path("on").asBoolean(false));
+                } else if (message.path("subs").isArray()) {
+                    bridge.setSubscriptions(message.path("subs").toString());
+                }
+                callback.success("{}");
+            } catch (Throwable error) {
+                String text = error.getMessage();
+                callback.failure(0, text == null || text.isEmpty()
+                        ? error.getClass().getSimpleName() : text);
+            }
+            return true;
         }
     }
 }

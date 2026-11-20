@@ -12,7 +12,6 @@ import com.dac.threatdetector.core.service.CsvParser.CsvRowItem;
 import com.dac.threatdetector.app.WindowsTheme;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -27,28 +26,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javafx.animation.PauseTransition;
-import javafx.application.Platform;
-import javafx.scene.web.WebEngine;
-import javafx.stage.FileChooser;
-import javafx.stage.Stage;
-import javafx.util.Duration;
-import netscape.javascript.JSObject;
 
 /**
  * Public bridge object exposed to JavaScript as window.__tdJavaBridge.
  *
- * <p>call() runs on the FX thread (JavaFX invokes Java members there), parses
- * the arguments, and hands all real work to virtual threads. Replies and
- * events go back through a bounded, coalescing outbox that is drained on the
- * FX thread with one {@link JSObject#call} per chunk.
+ * <p>call() runs on the host UI thread, parses the arguments, and hands all
+ * real work to virtual threads. Replies and events go back through a bounded,
+ * coalescing outbox that is drained on the UI thread with one
+ * {@link BridgeHost#deliver(String)} call per chunk.
  */
 public final class Bridge implements AutoCloseable {
 
     private static final Logger LOG = Logger.getLogger(Bridge.class.getName());
 
-    private final WebEngine engine;
-    private final Stage stage;
+    private final BridgeHost host;
     private final ObjectMapper mapper = new ObjectMapper();
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
     private final BatchRegistry registry = new BatchRegistry();
@@ -68,7 +59,7 @@ public final class Bridge implements AutoCloseable {
     private final Object outboxLock = new Object();
     private final LinkedHashMap<Object, String> outbox = new LinkedHashMap<>();
     private final AtomicLong deliverySeq = new AtomicLong();
-    private JSObject shim;
+    private volatile boolean deliveryReady;
     private boolean deliveryScheduled;
     private int chunkEvents = 64;
 
@@ -77,7 +68,7 @@ public final class Bridge implements AutoCloseable {
         return scriptCount;
     }
 
-    /** Total nanoseconds spent inside JSObject.call on the FX thread. */
+    /** Total nanoseconds spent inside the host's delivery call. */
     public long scriptNanos() {
         return scriptNanos;
     }
@@ -92,53 +83,33 @@ public final class Bridge implements AutoCloseable {
         return deliveredEvents;
     }
 
-    public Bridge(WebEngine engine, Stage stage) {
-        this.engine = engine;
-        this.stage = stage;
+    public Bridge(BridgeHost host) {
+        this.host = host;
     }
 
     public void setPageReady(boolean ready) {
         pageReady.set(ready);
         if (!ready) {
-            detachShim();
+            detach();
         }
     }
 
     /**
-     * Keeps a strong reference to the page's shim object and asks it which
-     * events currently have listeners. Called once per page load, before any
-     * batch can start. Delivery uses this object directly instead of building
-     * and parsing script text on every event.
+     * Marks the page as reachable for delivery. Called once per load, after the
+     * host has bound its JavaScript surface and (for JavaFX) the subscription
+     * set has been read from the shim.
      */
-    public void attachShim(JSObject window) {
-        try {
-            Object candidate = window == null ? null : window.getMember("__tdShim");
-            if (!(candidate instanceof JSObject shimObject)) {
-                shim = null;
-                return;
-            }
-            shim = shimObject;
-            Object list = shimObject.call("__subs");
-            if (list != null) {
-                setSubscriptions(String.valueOf(list));
-            }
-        } catch (Throwable error) {
-            LOG.log(Level.WARNING, "Could not attach the JS shim", error);
-            shim = null;
-        }
+    public void attachPage() {
+        deliveryReady = true;
     }
 
-    private void detachShim() {
-        JSObject forgotten;
+    private void detach() {
         synchronized (outboxLock) {
-            forgotten = shim;
-            shim = null;
+            deliveryReady = false;
             outbox.clear();
             deliveryScheduled = false;
         }
-        if (forgotten != null) {
-            LOG.fine("JS shim detached; pending deliveries cleared");
-        }
+        LOG.fine("Page detached; pending deliveries cleared");
     }
 
     /** Called from the shim whenever an event gains or loses its last listener. */
@@ -272,18 +243,13 @@ public final class Bridge implements AutoCloseable {
     }
 
     private void pickCsv(String callId) {
-        Platform.runLater(() -> {
-            try {
-                FileChooser chooser = new FileChooser();
-                chooser.setTitle("Select a CSV file to analyze");
-                chooser.getExtensionFilters().add(
-                        new FileChooser.ExtensionFilter("CSV files", "*.csv"));
-                File file = chooser.showOpenDialog(stage);
-                resolve(callId, file == null ? null : file.getAbsolutePath());
-            } catch (Throwable error) {
-                reject(callId, message(error));
-            }
-        });
+        try {
+            host.pickCsv(
+                    path -> resolve(callId, path),
+                    error -> reject(callId, message(error)));
+        } catch (Throwable error) {
+            reject(callId, message(error));
+        }
     }
 
     /**
@@ -379,31 +345,29 @@ public final class Bridge implements AutoCloseable {
                     droppedProgress += removed;
                 }
             }
-            schedule = !deliveryScheduled && shim != null;
+            schedule = !deliveryScheduled && deliveryReady && pageReady.get();
             if (schedule) {
                 deliveryScheduled = true;
             }
         }
         if (schedule) {
-            Platform.runLater(this::deliverChunk);
+            host.runOnUiThread(this::deliverChunk);
         }
     }
 
     /**
-     * Sends at most {@code chunkEvents} messages in one JSObject.call. The next
+     * Sends at most {@code chunkEvents} messages in one host delivery call. The next
      * chunk size follows the measured duration of this call, so a single
      * FX-thread call stays near {@link #CHUNK_TARGET_MS} ms instead of blocking
      * a whole pulse with a 500-event payload.
      */
     private void deliverChunk() {
-        JSObject target;
         List<String> batch = new ArrayList<>(Math.min(chunkEvents, 128));
         synchronized (outboxLock) {
-            if (shim == null || !pageReady.get() || outbox.isEmpty()) {
+            if (!deliveryReady || !pageReady.get() || outbox.isEmpty()) {
                 deliveryScheduled = false;
                 return;
             }
-            target = shim;
             var iterator = outbox.values().iterator();
             while (iterator.hasNext() && batch.size() < chunkEvents) {
                 batch.add(iterator.next());
@@ -426,7 +390,7 @@ public final class Bridge implements AutoCloseable {
         long started = System.nanoTime();
         boolean ok = true;
         try {
-            target.call("__deliver", json.toString());
+            host.deliver(json.toString());
         } catch (Throwable error) {
             ok = false;
             LOG.log(Level.FINE, "JS delivery failed", error);
@@ -439,7 +403,7 @@ public final class Bridge implements AutoCloseable {
 
         boolean more;
         synchronized (outboxLock) {
-            more = !outbox.isEmpty() && shim != null;
+            more = !outbox.isEmpty() && deliveryReady;
             if (more) {
                 deliveryScheduled = true;
             }
@@ -447,17 +411,11 @@ public final class Bridge implements AutoCloseable {
         if (!ok) {
             // The page went away between attach and delivery; drop what is left
             // rather than retrying against a dead document.
-            detachShim();
+            detach();
             return;
         }
         if (more) {
-            if (elapsed > 10_000_000L) {
-                PauseTransition pause = new PauseTransition(Duration.millis(16));
-                pause.setOnFinished(event -> deliverChunk());
-                pause.play();
-            } else {
-                Platform.runLater(this::deliverChunk);
-            }
+            host.runOnUiThread(this::deliverChunk);
         }
     }
 

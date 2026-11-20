@@ -1,20 +1,56 @@
-/* ===== JavaFX shim: presents the small part of window.__TAURI__ the app uses =====
-   This file is inert in a normal browser (the mock backend stays selected).
-   It is active only when App.java sets a user agent containing the marker
-   "ThreatDetectorJavaFX". It must load before js/core/td-config.js.
+/* ===== Desktop shim: presents the small part of window.__TAURI__ the app uses =====
+   Inert in a normal browser (the mock backend stays selected). Active when the
+   host user agent contains "ThreatDetectorJavaFX" (JavaFX WebView) or
+   "ThreatDetectorJCEF" (Chromium/JCEF). It must load before js/core/td-config.js.
    Exposes: __TAURI__.core.invoke(cmd,args) -> Promise
             __TAURI__.event.listen(name,cb) -> Promise<unlisten>
-   Java calls window.__tdShim.resolve / .reject / .emit on the FX thread. */
+   JavaFX injects window.__tdJavaBridge as a JSObject member; JCEF defines the
+   same call/subscribe/sync surface over CefMessageRouter. Both hosts deliver
+   replies and events through window.__tdShim. */
 (function () {
   "use strict";
-  if (!window.navigator || String(navigator.userAgent || "").indexOf("ThreatDetectorJavaFX") < 0) {
+  var ua = String((window.navigator && navigator.userAgent) || "");
+  var isJavaFx = ua.indexOf("ThreatDetectorJavaFX") >= 0;
+  var isJcef = ua.indexOf("ThreatDetectorJCEF") >= 0;
+  if (!isJavaFx && !isJcef) {
     return;
   }
 
-  /* [perf] JavaFX-only scoping hook: the java-perf.css layer is only linked on
-     the JavaFX pages and is scoped under this class, so a normal browser never
-     sees it. */
-  try { document.documentElement.classList.add("is-javafx"); } catch (e) { /* keep loading */ }
+  if (isJavaFx) {
+    /* [perf] JavaFX-only scoping hook: the java-perf.css layer is scoped under
+       this class, so a normal browser never sees it. Chromium does not need
+       those WebKit workarounds. */
+    try { document.documentElement.classList.add("is-javafx"); } catch (e) { /* keep loading */ }
+  }
+
+  /* JCEF has no JSObject member injection. Expose the identical bridge surface
+     over CEF's message router; replies still arrive through __tdShim. */
+  function jcefPost(message) {
+    if (typeof window.cefQuery !== "function") {
+      throw new Error("JCEF query bridge is unavailable");
+    }
+    window.cefQuery({
+      request: JSON.stringify(message),
+      persistent: false,
+      onSuccess: function () {},
+      onFailure: function () {}
+    });
+  }
+
+  if (isJcef && !window.__tdJavaBridge) {
+    window.__tdJavaBridge = {
+      call: function (callId, command, argsJson) {
+        jcefPost({ r: String(callId), c: String(command), a: String(argsJson || "{}") });
+      },
+      subscribe: function (name, on) {
+        jcefPost({ s: String(name), on: !!on });
+      },
+      sync: function (jsonArray) {
+        var names = parseJson(jsonArray);
+        if (names && typeof names.length === "number") jcefPost({ subs: names });
+      }
+    };
+  }
 
   var seq = 0;
   var pending = Object.create(null);
@@ -111,7 +147,6 @@
      Every other media query is passed through untouched. */
   var originalMatchMedia = window.matchMedia ? window.matchMedia.bind(window) : null;
   var darkMedia = "(prefers-color-scheme: dark)";
-  var ua = String(navigator.userAgent || "");
   var initialDark = ua.indexOf("TDSystemDark") >= 0 ? true
     : ua.indexOf("TDSystemLight") >= 0 ? false : null;
   var systemDark = initialDark;
@@ -360,6 +395,20 @@
   }
   pollSystemTheme();
   setInterval(pollSystemTheme, 3000);
+
+  /* JCEF: seed Java's subscription set once the page's listeners are wired.
+     Later demand changes are pushed by subscribe() above. */
+  if (isJcef) {
+    function syncSubscriptions() {
+      try {
+        if (window.__tdShim && window.__tdJavaBridge && window.__tdJavaBridge.sync) {
+          window.__tdJavaBridge.sync(window.__tdShim.__subs());
+        }
+      } catch (e) { /* subscribe() calls keep the set current */ }
+    }
+    syncSubscriptions();
+    window.addEventListener("load", syncSubscriptions);
+  }
 
   window.__TD_JAVA__ = true;
 })();
